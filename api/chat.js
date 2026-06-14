@@ -32,16 +32,22 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { messages, memory } = req.body || {};
+    const { messages, memory, search } = req.body || {};
     if (!Array.isArray(messages)) {
       return res.status(400).json({ error: "messages must be an array" });
     }
 
     // Gemini calls the assistant "model" instead of "assistant".
-    const contents = messages.map((m) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: String(m.content || "") }],
-    }));
+    // Each message can carry text and/or an attached file (image or PDF).
+    const contents = messages.map((m) => {
+      const parts = [];
+      if (m.content) parts.push({ text: String(m.content) });
+      if (m.file && m.file.data && m.file.mime_type) {
+        parts.push({ inline_data: { mime_type: m.file.mime_type, data: m.file.data } });
+      }
+      if (!parts.length) parts.push({ text: "" });
+      return { role: m.role === "assistant" ? "model" : "user", parts };
+    });
 
     // The model has no clock, so we tell it the real time each request.
     // Change "America/New_York" if you're ever in a different timezone.
@@ -67,17 +73,21 @@ export default async function handler(req, res) {
       "https://generativelanguage.googleapis.com/v1beta/models/" +
       MODEL + ":generateContent";
 
+    const reqBody = {
+      system_instruction: { parts: [{ text: systemText }] },
+      contents,
+      generationConfig: { maxOutputTokens: 1000, temperature: 0.8 },
+    };
+    // Only ground on live web results when the user turns search on.
+    if (search === true) reqBody.tools = [{ google_search: {} }];
+
     const r = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "x-goog-api-key": KEY,
       },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: systemText }] },
-        contents,
-        generationConfig: { maxOutputTokens: 1000, temperature: 0.8 },
-      }),
+      body: JSON.stringify(reqBody),
     });
 
     if (!r.ok) {
