@@ -133,7 +133,7 @@
     border-radius:22px;padding:9px 9px 9px 18px;box-shadow:var(--shadow);transition:border-color .18s}
   .field:focus-within{border-color:rgba(174,200,255,0.5)}
   textarea{flex:1;resize:none;border:none;outline:none;background:transparent;color:var(--ink);
-    font-family:var(--body);font-size:15.5px;line-height:1.5;max-height:200px;padding:9px 0}
+    font-family:var(--body);font-size:15.5px;line-height:1.5;max-height:200px;padding:9px 0;overflow-y:hidden}
   textarea::placeholder{color:var(--faint)}
   .send{width:38px;height:38px;flex:0 0 auto;border:none;border-radius:50%;background:var(--ink);
     color:#0A0C10;cursor:pointer;display:grid;place-items:center;transition:transform .12s,opacity .16s}
@@ -160,10 +160,16 @@
   .new-chat svg{width:16px;height:16px;stroke:var(--muted);fill:none;stroke-width:2;stroke-linecap:round}
   .recent{margin-top:22px;flex:1;overflow-y:auto}
   .recent .h{font-size:11px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--faint);padding:0 10px 10px}
-  .ritem{display:block;font-size:13.5px;color:var(--muted);padding:9px 10px;border-radius:9px;cursor:pointer;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background .14s,color .14s}
+  .ritem{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--muted);padding:9px 10px;
+    border-radius:9px;cursor:pointer;transition:background .14s,color .14s}
+  .ritem .tt{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .ritem:hover{background:rgba(255,255,255,0.04);color:var(--ink)}
   .ritem.active{background:rgba(255,255,255,0.055);color:var(--ink)}
+  .ritem .del{opacity:0;border:none;background:none;color:var(--faint);cursor:pointer;font-size:17px;
+    line-height:1;padding:2px 5px;border-radius:6px;flex:0 0 auto}
+  .ritem:hover .del{opacity:1}
+  .ritem .del:hover{color:var(--ink);background:rgba(255,255,255,0.08)}
+  .rempty{font-size:12.5px;color:var(--faint);padding:6px 10px}
   .drawer-foot{border-top:1px solid var(--line);padding-top:12px;margin-top:8px}
   .profile{display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:11px}
   .pfp{width:30px;height:30px;border-radius:50%;flex:0 0 auto;
@@ -237,10 +243,7 @@
     </button>
     <div class="recent">
       <div class="h">Recent</div>
-      <div class="ritem active">Current conversation</div>
-      <div class="ritem">Project planning</div>
-      <div class="ritem">Code review notes</div>
-      <div class="ritem">Weekend ideas</div>
+      <div id="recentList"></div>
     </div>
     <div class="drawer-foot">
       <div class="profile">
@@ -272,6 +275,58 @@ const app=document.getElementById('app'), conv=document.getElementById('conv'),
 heroSlot.appendChild(document.getElementById('composerTpl').content.cloneNode(true));
 let input=document.getElementById('input'), sendBtn=document.getElementById('send');
 let history=[], busy=false, chatting=false;
+
+/* ===== memory: save chats to the browser so they survive a refresh ===== */
+let currentId=null;
+const LS='atlas.chats';
+function loadChats(){ try{ return JSON.parse(localStorage.getItem(LS))||[]; }catch(e){ return []; } }
+function saveChats(a){ try{ localStorage.setItem(LS, JSON.stringify(a)); }catch(e){} }
+function persist(){
+  if(!history.length) return;
+  try{
+    const chats=loadChats();
+    const first=history.find(m=>m.role==='user');
+    const title=(first?first.content:'New chat').slice(0,42);
+    if(!currentId) currentId=Date.now().toString(36);
+    const rec={id:currentId,title,messages:history.slice(),updated:Date.now()};
+    const i=chats.findIndex(c=>c.id===currentId);
+    if(i>=0) chats[i]=rec; else chats.unshift(rec);
+    chats.sort((a,b)=>b.updated-a.updated);
+    saveChats(chats.slice(0,50));
+    renderRecents();
+  }catch(e){}
+}
+function renderRecents(){
+  const list=document.getElementById('recentList'); if(!list) return;
+  const chats=loadChats();
+  if(!chats.length){ list.innerHTML='<div class="rempty">No saved chats yet.</div>'; return; }
+  list.innerHTML='';
+  chats.forEach(c=>{
+    const row=document.createElement('div'); row.className='ritem'+(c.id===currentId?' active':'');
+    const tt=document.createElement('span'); tt.className='tt'; tt.textContent=c.title||'Untitled';
+    const del=document.createElement('button'); del.className='del'; del.textContent='\u00D7'; del.title='Delete';
+    row.appendChild(tt); row.appendChild(del);
+    row.addEventListener('click',e=>{ if(e.target===del) return; openChat(c.id); });
+    del.addEventListener('click',e=>{ e.stopPropagation(); deleteChat(c.id); });
+    list.appendChild(row);
+  });
+}
+function rebuildConv(){
+  conv.innerHTML='';
+  history.forEach(m=>{ if(m.role==='user') addUser(m.content); else addAtlas(m.content); });
+  scroll.scrollTop=scroll.scrollHeight;
+}
+function openChat(id){
+  const rec=loadChats().find(c=>c.id===id); if(!rec) return;
+  currentId=id; history=rec.messages.slice();
+  chatting=true; app.classList.add('chatting');
+  dockSlot.appendChild(document.getElementById('composer'));
+  rebuildConv(); renderRecents(); closeDrawer(); input.focus();
+}
+function deleteChat(id){
+  saveChats(loadChats().filter(c=>c.id!==id));
+  if(id===currentId) newChat(); else renderRecents();
+}
 
 (function(){ const h=new Date().getHours();
   document.getElementById('greeting').textContent =
@@ -337,12 +392,14 @@ async function send(){
   input.value=''; autosize(); showThinking();
   try{ const reply=await askBrain(history); clearThinking();
     await typeAtlas(reply||"Came back empty on that one. Say it another way?");
-    history.push({role:'assistant',content:reply});
+    history.push({role:'assistant',content:reply}); persist();
   }catch(e){ clearThinking();
     addAtlas("Lost the signal reaching my brain. Check the connection and try again.").style.color='var(--danger)';
+    persist();
   }finally{ busy=false; sendBtn.disabled=false; input.focus(); }
 }
-function autosize(){ input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,200)+'px'; }
+function autosize(){ input.style.height='auto'; const h=Math.min(input.scrollHeight,200);
+  input.style.height=h+'px'; input.style.overflowY=input.scrollHeight>200?'auto':'hidden'; }
 input.addEventListener('input', autosize);
 input.addEventListener('keydown', e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); send(); }});
 sendBtn.addEventListener('click', send);
@@ -352,9 +409,9 @@ document.querySelectorAll('.chip').forEach(c=>{
   c.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); fill(); }});
 });
 
-function newChat(){ history=[]; conv.innerHTML=''; chatting=false; app.classList.remove('chatting');
+function newChat(){ currentId=null; history=[]; conv.innerHTML=''; chatting=false; app.classList.remove('chatting');
   heroSlot.appendChild(document.getElementById('composer')); input.value=''; autosize();
-  closeDrawer(); input.focus(); }
+  renderRecents(); closeDrawer(); input.focus(); }
 document.getElementById('newBtn').addEventListener('click', newChat);
 document.getElementById('newChat').addEventListener('click', newChat);
 
@@ -367,6 +424,7 @@ document.getElementById('closeBtn').addEventListener('click', closeDrawer);
 scrim.addEventListener('click', closeDrawer);
 addEventListener('keydown', e=>{ if(e.key==='Escape') closeDrawer(); });
 
+renderRecents();
 input.focus();
 </script>
 </body>
