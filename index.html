@@ -141,6 +141,23 @@
   .send:focus-visible{outline:2px solid var(--glow);outline-offset:3px}
   .send:disabled{opacity:.28;cursor:not-allowed;transform:none}
   .send svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+  .tool{width:36px;height:36px;flex:0 0 auto;border:none;border-radius:50%;background:transparent;color:var(--muted);
+    cursor:pointer;display:grid;place-items:center;transition:background .15s,color .15s}
+  .tool:hover{background:rgba(255,255,255,0.06);color:var(--ink)}
+  .tool:focus-visible{outline:2px solid var(--glow);outline-offset:2px}
+  .tool svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .tool.active{background:rgba(174,200,255,0.16);color:var(--glow)}
+  .attach-row{display:flex;flex-wrap:wrap;gap:8px;padding:0 4px 8px}
+  .attach-row:empty{display:none}
+  .apreview{display:flex;align-items:center;gap:8px;background:var(--raised);border:1px solid var(--line-2);
+    border-radius:11px;padding:6px 8px 6px 6px;max-width:240px}
+  .apreview img{width:34px;height:34px;border-radius:7px;object-fit:cover;flex:0 0 auto}
+  .apreview .an{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .apreview .ax{border:none;background:none;color:var(--faint);cursor:pointer;font-size:16px;line-height:1;padding:0 2px;flex:0 0 auto}
+  .apreview .ax:hover{color:var(--ink)}
+  .msg.user .bubble .umg{display:block;max-width:260px;max-height:260px;border-radius:11px;margin-bottom:8px}
+  .msg.user .bubble .filechip{font-size:13px;color:var(--muted);background:rgba(255,255,255,0.05);
+    border:1px solid var(--line);border-radius:9px;padding:7px 11px;margin-bottom:8px;display:inline-block}
   .undertext{text-align:center;font-size:11.5px;color:var(--faint);margin-top:11px}
 
   /* ---- history slide-over (right) ---- */
@@ -267,12 +284,20 @@
 
   <template id="composerTpl">
     <div class="composer" id="composer">
+      <div id="attachRow" class="attach-row"></div>
       <div class="field">
+        <button class="tool" id="attachBtn" aria-label="Attach image or PDF" title="Attach image or PDF">
+          <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a5 5 0 0 1-7.07-7.07l9.19-9.19a3 3 0 0 1 4.24 4.24l-9.2 9.19a1 1 0 0 1-1.41-1.41l8.49-8.49"/></svg>
+        </button>
         <textarea id="input" rows="1" placeholder="Ask Atlas anything"></textarea>
+        <button class="tool" id="searchBtn" aria-label="Toggle web search" title="Web search">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+        </button>
         <button class="send" id="send" aria-label="Send message">
           <svg viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
         </button>
       </div>
+      <input type="file" id="fileInput" accept="image/*,application/pdf" hidden />
       <div class="undertext">Atlas can make mistakes. Check important info. Session memory only.</div>
     </div>
   </template>
@@ -286,7 +311,9 @@ const app=document.getElementById('app'), conv=document.getElementById('conv'),
 
 heroSlot.appendChild(document.getElementById('composerTpl').content.cloneNode(true));
 let input=document.getElementById('input'), sendBtn=document.getElementById('send');
-let history=[], busy=false, chatting=false;
+const attachBtn=document.getElementById('attachBtn'), searchBtn=document.getElementById('searchBtn'),
+      fileInput=document.getElementById('fileInput');
+let history=[], busy=false, chatting=false, pendingFile=null, searchOn=false;
 
 /* ===== memory: save chats to the browser so they survive a refresh ===== */
 let currentId=null;
@@ -298,9 +325,13 @@ function persist(){
   try{
     const chats=loadChats();
     const first=history.find(m=>m.role==='user');
-    const title=(first?first.content:'New chat').slice(0,42);
+    const title=((first&&first.content)||(first&&first.file&&(first.file.name||'Attachment'))||'New chat').slice(0,42);
     if(!currentId) currentId=Date.now().toString(36);
-    const rec={id:currentId,title,messages:history.slice(),updated:Date.now()};
+    // strip heavy file bytes before saving so we don't blow the browser's storage limit
+    const safe=history.map(m=> m.file
+      ? {role:m.role,content:m.content,file:{name:m.file.name,mime_type:m.file.mime_type}}
+      : m);
+    const rec={id:currentId,title,messages:safe,updated:Date.now()};
     const i=chats.findIndex(c=>c.id===currentId);
     if(i>=0) chats[i]=rec; else chats.unshift(rec);
     chats.sort((a,b)=>b.updated-a.updated);
@@ -325,7 +356,7 @@ function renderRecents(){
 }
 function rebuildConv(){
   conv.innerHTML='';
-  history.forEach(m=>{ if(m.role==='user') addUser(m.content); else addAtlas(m.content); });
+  history.forEach(m=>{ if(m.role==='user') addUser(m.content, m.file); else addAtlas(m.content); });
   scroll.scrollTop=scroll.scrollHeight;
 }
 function openChat(id){
@@ -347,9 +378,19 @@ function deleteChat(id){
 function moveComposerToBottom(){ if(chatting) return;
   chatting=true; app.classList.add('chatting');
   dockSlot.appendChild(document.getElementById('composer')); input.focus(); }
-function addUser(t){ const e=document.createElement('div'); e.className='msg user';
-  e.innerHTML='<div class="bubble"></div>'; e.querySelector('.bubble').textContent=t;
-  conv.appendChild(e); scroll.scrollTop=scroll.scrollHeight; }
+function addUser(t, file){ const e=document.createElement('div'); e.className='msg user';
+  const b=document.createElement('div'); b.className='bubble';
+  if(file){
+    if(file.data && file.mime_type && file.mime_type.indexOf('image/')===0){
+      const img=document.createElement('img'); img.className='umg';
+      img.src='data:'+file.mime_type+';base64,'+file.data; b.appendChild(img);
+    } else {
+      const chip=document.createElement('div'); chip.className='filechip';
+      chip.textContent=(file.name||'Attachment'); b.appendChild(chip);
+    }
+  }
+  if(t){ const tx=document.createElement('div'); tx.textContent=t; b.appendChild(tx); }
+  e.appendChild(b); conv.appendChild(e); scroll.scrollTop=scroll.scrollHeight; }
 function renderInto(body, t){
   try{
     if(window.marked && window.DOMPurify){
@@ -392,17 +433,19 @@ function typeAtlas(text){
 async function askBrain(history){
   let memory=''; try{ memory=localStorage.getItem('atlas.memory')||''; }catch(e){}
   const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({messages:history, memory})});
+    body:JSON.stringify({messages:history, memory, search:searchOn})});
   if(!res.ok) throw new Error('offline');
   const data=await res.json(); return data.reply;
 }
 
 async function send(){
-  const text=input.value.trim(); if(!text||busy) return;
+  const text=input.value.trim(); if((!text && !pendingFile)||busy) return;
   busy=true; sendBtn.disabled=true;
-  moveComposerToBottom(); addUser(text);
-  history.push({role:'user',content:text});
-  input.value=''; autosize(); showThinking();
+  moveComposerToBottom();
+  const file=pendingFile;
+  addUser(text, file);
+  history.push(file ? {role:'user',content:text,file} : {role:'user',content:text});
+  clearAttach(); input.value=''; autosize(); showThinking();
   try{ const reply=await askBrain(history); clearThinking();
     await typeAtlas(reply||"Came back empty on that one. Say it another way?");
     history.push({role:'assistant',content:reply}); persist();
@@ -425,6 +468,32 @@ document.querySelectorAll('.chip').forEach(c=>{
 function newChat(){ currentId=null; history=[]; conv.innerHTML=''; chatting=false; app.classList.remove('chatting');
   heroSlot.appendChild(document.getElementById('composer')); input.value=''; autosize();
   renderRecents(); closeDrawer(); input.focus(); }
+function readFile(file){ return new Promise((res,rej)=>{ const r=new FileReader();
+  r.onload=()=>res(r.result.split(',')[1]); r.onerror=rej; r.readAsDataURL(file); }); }
+function renderAttachPreview(f){
+  const row=document.getElementById('attachRow'); row.innerHTML='';
+  const chip=document.createElement('div'); chip.className='apreview';
+  if(f.mime_type.indexOf('image/')===0){ const img=document.createElement('img');
+    img.src='data:'+f.mime_type+';base64,'+f.data; chip.appendChild(img); }
+  const nm=document.createElement('span'); nm.className='an'; nm.textContent=f.name; chip.appendChild(nm);
+  const x=document.createElement('button'); x.className='ax'; x.textContent='\u00D7'; x.title='Remove';
+  x.addEventListener('click', clearAttach); chip.appendChild(x);
+  row.appendChild(chip);
+}
+function clearAttach(){ pendingFile=null; const r=document.getElementById('attachRow'); if(r) r.innerHTML=''; }
+
+attachBtn.addEventListener('click', ()=>fileInput.click());
+fileInput.addEventListener('change', async ()=>{
+  const f=fileInput.files[0]; fileInput.value='';
+  if(!f) return;
+  if(f.size > 8*1024*1024){ alert('That file is too big — please keep it under 8MB.'); return; }
+  try{ const data=await readFile(f);
+    pendingFile={name:f.name, mime_type:f.type||'application/octet-stream', data};
+    renderAttachPreview(pendingFile); input.focus();
+  }catch(e){ alert("Couldn't read that file. Try another one."); }
+});
+searchBtn.addEventListener('click', ()=>{ searchOn=!searchOn; searchBtn.classList.toggle('active', searchOn); });
+
 document.getElementById('newBtn').addEventListener('click', newChat);
 document.getElementById('newChat').addEventListener('click', newChat);
 
