@@ -122,10 +122,8 @@
     padding:12px 18px;font-size:15.5px;line-height:1.6;max-width:78%;white-space:pre-wrap;word-wrap:break-word}
   .thinking{display:flex;gap:15px;align-items:center;margin-bottom:30px}
   .thinking .orb{--d:22px;animation-duration:2.2s}
-  .dots{display:flex;gap:5px}
-  .dots i{width:6px;height:6px;border-radius:50%;background:var(--muted);animation:pop 1.3s ease-in-out infinite}
-  .dots i:nth-child(2){animation-delay:.18s}.dots i:nth-child(3){animation-delay:.36s}
-  @keyframes pop{0%,100%{opacity:.3;transform:translateY(0)}50%{opacity:1;transform:translateY(-3px)}}
+  .thinking .caret{width:7px;height:17px;border-radius:2px;background:var(--muted);animation:blink 1.1s ease-in-out infinite}
+  @keyframes blink{0%,100%{opacity:.18}50%{opacity:.65}}
 
   /* bottom composer dock */
   .bottom{flex:0 0 auto;display:none;padding:8px 20px 22px}
@@ -176,7 +174,7 @@
 
   @media (max-width:560px){ .hero h1{font-size:29px} .brand .stat{display:none} }
   @media (prefers-reduced-motion: reduce){
-    .orb,.orb.ring::after,.hero>*,.hero .orb,.msg,.dots i{animation:none !important}
+    .orb,.orb.ring::after,.hero>*,.hero .orb,.msg{animation:none !important}
     .drawer,.scrim{transition:none !important}
   }
 </style>
@@ -301,9 +299,27 @@ function addAtlas(t){ const e=document.createElement('div'); e.className='msg at
   const body=e.querySelector('.body'); renderInto(body, t);
   conv.appendChild(e); scroll.scrollTop=scroll.scrollHeight; return body; }
 function showThinking(){ const e=document.createElement('div'); e.className='thinking'; e.id='thinking';
-  e.innerHTML=ORB+'<div class="dots"><i></i><i></i><i></i></div>';
+  e.innerHTML=ORB+'<span class="caret"></span>';
   conv.appendChild(e); scroll.scrollTop=scroll.scrollHeight; }
 function clearThinking(){ const t=document.getElementById('thinking'); if(t) t.remove(); }
+
+/* types the reply out live, then swaps in formatted markdown */
+function typeAtlas(text){
+  return new Promise(resolve=>{
+    const e=document.createElement('div'); e.className='msg atlas';
+    e.innerHTML='<div class="av">'+ORB+'</div><div class="body"></div>';
+    const body=e.querySelector('.body'); conv.appendChild(e);
+    const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if(reduce || !text){ renderInto(body,text); scroll.scrollTop=scroll.scrollHeight; return resolve(); }
+    let i=0;
+    (function step(){
+      i+=3; body.textContent=text.slice(0,i);
+      scroll.scrollTop=scroll.scrollHeight;
+      if(i<text.length){ setTimeout(step,12); }
+      else { renderInto(body,text); scroll.scrollTop=scroll.scrollHeight; resolve(); }
+    })();
+  });
+}
 
 /* ===== brain — calls your proxy at /api/chat ===== */
 async function askBrain(history){
@@ -320,7 +336,7 @@ async function send(){
   history.push({role:'user',content:text});
   input.value=''; autosize(); showThinking();
   try{ const reply=await askBrain(history); clearThinking();
-    addAtlas(reply||"Came back empty on that one. Say it another way?");
+    await typeAtlas(reply||"Came back empty on that one. Say it another way?");
     history.push({role:'assistant',content:reply});
   }catch(e){ clearThinking();
     addAtlas("Lost the signal reaching my brain. Check the connection and try again.").style.color='var(--danger)';
