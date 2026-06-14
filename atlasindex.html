@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Atlas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=Inter:wght@400;450;500;600&display=swap" rel="stylesheet" />
+<style>
+  /* ============================================================
+     ATLAS — a calm, luminous, near-monochrome interface.
+     One light source: the orb. Everything else stays quiet.
+     ============================================================ */
+  :root {
+    --bg:      #0A0C10;
+    --panel:   #0E1116;
+    --raised:  #161A21;
+    --ink:     #F3F5F8;
+    --muted:   #98A0AC;
+    --faint:   #585F69;
+    --line:    rgba(255,255,255,0.07);
+    --line-2:  rgba(255,255,255,0.13);
+    --glow:    #AEC8FF;   /* the single accent — light only */
+    --glow-dim: rgba(174,200,255,0.16);
+    --danger:  #E89B7A;
+    --display: "Inter Tight", system-ui, sans-serif;
+    --body:    "Inter", system-ui, sans-serif;
+    --shadow:  0 24px 60px -24px rgba(0,0,0,0.85);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--body);
+    overflow: hidden; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  ::selection { background: rgba(174,200,255,0.25); }
+
+  /* ambient: one soft cool glow, gentle vignette */
+  .ambient { position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background:
+      radial-gradient(80% 50% at 50% -8%, rgba(174,200,255,0.08), transparent 60%),
+      radial-gradient(120% 120% at 50% 120%, rgba(0,0,0,0.5), transparent 50%); }
+
+  /* ============================================================
+     SIGNATURE — the orb
+     ============================================================ */
+  .orb { --d: 24px; width: var(--d); height: var(--d); border-radius: 50%;
+    position: relative; flex: 0 0 auto;
+    background: radial-gradient(circle at 38% 30%,
+      #ffffff 0%, #d6e3ff 20%, #89a9ec 52%, #36507f 80%, #1b2c49 100%);
+    box-shadow: 0 0 calc(var(--d) * 0.9) calc(var(--d) * -0.25) var(--glow-dim),
+      inset 0 0 calc(var(--d) * 0.5) rgba(255,255,255,0.22);
+    animation: breathe 4.6s ease-in-out infinite; }
+  .orb.ring::after { content: ""; position: absolute; inset: calc(var(--d) * -0.3);
+    border-radius: 50%; border: 1px solid var(--glow-dim);
+    animation: spin 22s linear infinite; }
+  @keyframes breathe { 0%,100% { box-shadow: 0 0 calc(var(--d)*0.9) calc(var(--d)*-0.25) var(--glow-dim), inset 0 0 calc(var(--d)*0.5) rgba(255,255,255,0.22); }
+    50% { box-shadow: 0 0 calc(var(--d)*1.3) calc(var(--d)*-0.15) rgba(174,200,255,0.34), inset 0 0 calc(var(--d)*0.5) rgba(255,255,255,0.3); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ============================================================
+     LAYOUT
+     ============================================================ */
+  .app { position: relative; z-index: 1; display: grid;
+    grid-template-columns: 270px 1fr; height: 100vh; height: 100dvh; }
+
+  /* sidebar */
+  .rail { background: var(--panel); border-right: 1px solid var(--line);
+    display: flex; flex-direction: column; padding: 20px 14px; }
+  .rail-top { display: flex; align-items: center; gap: 12px; padding: 4px 8px 22px; }
+  .rail-top .orb { --d: 22px; }
+  .wordmark { font-family: var(--display); font-weight: 600; font-size: 21px; letter-spacing: -0.2px; }
+
+  .new-chat { display: flex; align-items: center; gap: 10px; width: 100%;
+    font-family: var(--body); font-size: 14px; font-weight: 500; color: var(--ink);
+    background: var(--raised); border: 1px solid var(--line-2); border-radius: 12px;
+    padding: 11px 14px; cursor: pointer; transition: background .16s, border-color .16s; }
+  .new-chat:hover { background: #1C2129; border-color: rgba(255,255,255,0.2); }
+  .new-chat:focus-visible { outline: 2px solid var(--glow); outline-offset: 2px; }
+  .new-chat svg { width: 16px; height: 16px; stroke: var(--muted); }
+
+  .recent { margin-top: 26px; flex: 1; overflow-y: auto; }
+  .recent .h { font-size: 11px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase;
+    color: var(--faint); padding: 0 10px 10px; }
+  .ritem { display: block; font-size: 13.5px; color: var(--muted); padding: 9px 10px;
+    border-radius: 9px; cursor: pointer; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; transition: background .14s, color .14s; }
+  .ritem:hover { background: rgba(255,255,255,0.04); color: var(--ink); }
+  .ritem.active { background: rgba(255,255,255,0.055); color: var(--ink); }
+
+  .rail-foot { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 8px; }
+  .profile { display: flex; align-items: center; gap: 11px; padding: 8px 10px;
+    border-radius: 11px; cursor: pointer; transition: background .14s; }
+  .profile:hover { background: rgba(255,255,255,0.04); }
+  .pfp { width: 30px; height: 30px; border-radius: 50%; flex: 0 0 auto;
+    background: radial-gradient(circle at 38% 30%, #fff, #aebfe0 60%, #5d6f93);
+    color: #10141c; display: grid; place-items: center; font-size: 12px; font-weight: 700; }
+  .profile .n { font-size: 13px; font-weight: 500; }
+  .profile .p { font-size: 11px; color: var(--faint); }
+
+  /* main */
+  .main { position: relative; display: flex; flex-direction: column; min-width: 0; }
+  .topbar { display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 22px; }
+  .menu-btn { display: none; background: none; border: none; cursor: pointer; padding: 4px; }
+  .menu-btn svg { width: 22px; height: 22px; stroke: var(--ink); }
+  .model { font-size: 12.5px; color: var(--muted); border: 1px solid var(--line-2);
+    border-radius: 100px; padding: 6px 13px; display: inline-flex; align-items: center; gap: 8px; }
+  .model .d { width: 6px; height: 6px; border-radius: 50%; background: var(--glow);
+    box-shadow: 0 0 8px var(--glow); }
+
+  .scroll { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+  .scroll::-webkit-scrollbar { width: 10px; }
+  .scroll::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 10px; }
+
+  /* hero */
+  .hero { flex: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; padding: 24px 20px; gap: 30px; }
+  .hero .orb { --d: 60px; }
+  .hero h1 { font-family: var(--display); font-weight: 500; font-size: 38px;
+    letter-spacing: -0.6px; text-align: center; }
+  .hero-composer { width: 100%; max-width: 720px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 9px; justify-content: center; max-width: 560px; }
+  .chip { font-size: 13.5px; color: var(--muted); background: var(--raised);
+    border: 1px solid var(--line); padding: 9px 16px; border-radius: 100px; cursor: pointer;
+    transition: border-color .15s, color .15s; }
+  .chip:hover { border-color: var(--line-2); color: var(--ink); }
+  .chip:focus-visible { outline: 2px solid var(--glow); outline-offset: 2px; }
+
+  /* entrance */
+  .hero > * { animation: rise .7s cubic-bezier(.2,.7,.2,1) both; }
+  .hero .orb { animation: breathe 4.6s ease-in-out infinite, rise .8s cubic-bezier(.2,.7,.2,1) both; }
+  .hero > *:nth-child(2) { animation-delay: .08s; }
+  .hero > *:nth-child(3) { animation-delay: .16s; }
+  .hero > *:nth-child(4) { animation-delay: .24s; }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+  /* conversation */
+  .conv { display: none; width: 100%; max-width: 720px; margin: 0 auto; padding: 26px 20px 14px; }
+  .app.chatting .hero { display: none; }
+  .app.chatting .conv { display: block; }
+
+  .msg { margin-bottom: 30px; animation: fade .3s ease both; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } }
+  .msg.atlas { display: flex; gap: 15px; }
+  .msg.atlas .av { margin-top: 3px; }
+  .msg.atlas .av .orb { --d: 22px; }
+  .msg.atlas .body { font-size: 15.5px; line-height: 1.78; color: var(--ink);
+    white-space: pre-wrap; word-wrap: break-word; }
+  .msg.user { display: flex; justify-content: flex-end; }
+  .msg.user .bubble { background: var(--raised); border: 1px solid var(--line);
+    border-radius: 18px 18px 5px 18px; padding: 12px 18px; font-size: 15.5px;
+    line-height: 1.6; max-width: 78%; white-space: pre-wrap; word-wrap: break-word; }
+
+  .thinking { display: flex; gap: 15px; align-items: center; margin-bottom: 30px; }
+  .thinking .orb { --d: 22px; animation-duration: 2.2s; }
+  .dots { display: flex; gap: 5px; }
+  .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--muted);
+    animation: pop 1.3s ease-in-out infinite; }
+  .dots i:nth-child(2){ animation-delay: .18s; } .dots i:nth-child(3){ animation-delay: .36s; }
+  @keyframes pop { 0%,100%{ opacity:.3; transform: translateY(0); } 50%{ opacity:1; transform: translateY(-3px); } }
+
+  /* bottom dock */
+  .bottom { display: none; padding: 8px 20px 22px; }
+  .app.chatting .bottom { display: block; }
+
+  /* composer (moves hero <-> bottom) */
+  .composer { width: 100%; max-width: 720px; margin: 0 auto; }
+  .field { display: flex; align-items: flex-end; gap: 8px; background: var(--raised);
+    border: 1px solid var(--line-2); border-radius: 22px; padding: 9px 9px 9px 18px;
+    box-shadow: var(--shadow); transition: border-color .18s; }
+  .field:focus-within { border-color: rgba(174,200,255,0.5); }
+  textarea { flex: 1; resize: none; border: none; outline: none; background: transparent;
+    color: var(--ink); font-family: var(--body); font-size: 15.5px; line-height: 1.5;
+    max-height: 200px; padding: 9px 0; }
+  textarea::placeholder { color: var(--faint); }
+  .send { width: 38px; height: 38px; flex: 0 0 auto; border: none; border-radius: 50%;
+    background: var(--ink); color: #0A0C10; cursor: pointer; display: grid; place-items: center;
+    transition: transform .12s, opacity .16s; }
+  .send:hover { transform: translateY(-1px); }
+  .send:focus-visible { outline: 2px solid var(--glow); outline-offset: 3px; }
+  .send:disabled { opacity: .28; cursor: not-allowed; transform: none; }
+  .send svg { width: 17px; height: 17px; }
+  .undertext { text-align: center; font-size: 11.5px; color: var(--faint); margin-top: 11px; }
+
+  /* responsive */
+  @media (max-width: 780px) {
+    .app { grid-template-columns: 1fr; }
+    .rail { position: fixed; inset: 0 auto 0 0; width: 270px; z-index: 30;
+      transform: translateX(-100%); transition: transform .22s ease; box-shadow: var(--shadow); }
+    .app.menu-open .rail { transform: translateX(0); }
+    .menu-btn { display: block; }
+    .hero h1 { font-size: 29px; }
+    .scrim { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 20;
+      opacity: 0; pointer-events: none; transition: opacity .2s; }
+    .app.menu-open .scrim { opacity: 1; pointer-events: auto; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .orb, .orb.ring::after, .hero > *, .hero .orb, .msg, .dots i { animation: none !important; }
+  }
+</style>
+</head>
+<body>
+  <div class="ambient"></div>
+
+  <div class="app" id="app">
+    <div class="scrim" id="scrim"></div>
+
+    <!-- sidebar -->
+    <aside class="rail">
+      <div class="rail-top">
+        <span class="orb ring"></span>
+        <span class="wordmark">Atlas</span>
+      </div>
+      <button class="new-chat" id="newChat">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New chat
+      </button>
+      <div class="recent">
+        <div class="h">Recent</div>
+        <div class="ritem active">New conversation</div>
+        <div class="ritem">Project planning</div>
+        <div class="ritem">Code review notes</div>
+        <div class="ritem">Weekend ideas</div>
+      </div>
+      <div class="rail-foot">
+        <div class="profile">
+          <div class="pfp">B</div>
+          <div><div class="n">Beast</div><div class="p">Free plan</div></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- main -->
+    <main class="main">
+      <div class="topbar">
+        <button class="menu-btn" id="menuBtn"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+        <span></span>
+        <span class="model"><span class="d"></span><span id="model">Gemini</span></span>
+      </div>
+
+      <div class="scroll" id="scroll">
+        <div class="hero" id="hero">
+          <span class="orb ring"></span>
+          <h1 id="greeting">Good evening.</h1>
+          <div class="hero-composer" id="heroSlot"></div>
+          <div class="chips">
+            <div class="chip" tabindex="0" data-prompt="Explain a concept I've always found confusing, in plain terms.">Explain a concept</div>
+            <div class="chip" tabindex="0" data-prompt="Help me write something. I'll tell you what next.">Help me write</div>
+            <div class="chip" tabindex="0" data-prompt="Help me debug some code. I'll paste it next.">Debug code</div>
+            <div class="chip" tabindex="0" data-prompt="Brainstorm some ideas with me.">Brainstorm</div>
+          </div>
+        </div>
+        <div class="conv" id="conv"></div>
+      </div>
+
+      <div class="bottom"><div id="dockSlot"></div></div>
+    </main>
+  </div>
+
+  <template id="composerTpl">
+    <div class="composer" id="composer">
+      <div class="field">
+        <textarea id="input" rows="1" placeholder="Ask Atlas anything"></textarea>
+        <button class="send" id="send" aria-label="Send message">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+        </button>
+      </div>
+      <div class="undertext">Atlas can make mistakes. Check important info. Session memory only.</div>
+    </div>
+  </template>
+
+<script>
+/* ===== Atlas front end =====
+   This talks to /api/chat (your proxy), which holds the Gemini key
+   and Atlas's personality. To change how Atlas behaves, edit the
+   SYSTEM_PROMPT inside api/chat.js — not here. */
+const ORB = '<span class="orb"></span>';
+const app = document.getElementById('app'),
+      conv = document.getElementById('conv'),
+      scroll = document.getElementById('scroll'),
+      heroSlot = document.getElementById('heroSlot'),
+      dockSlot = document.getElementById('dockSlot');
+
+heroSlot.appendChild(document.getElementById('composerTpl').content.cloneNode(true));
+let input = document.getElementById('input'),
+    sendBtn = document.getElementById('send');
+let history = [], busy = false, chatting = false;
+
+/* time-aware greeting */
+(function(){
+  const h = new Date().getHours();
+  document.getElementById('greeting').textContent =
+      h < 5  ? "Still up?"
+    : h < 12 ? "Good morning."
+    : h < 18 ? "Good afternoon."
+    :          "Good evening.";
+})();
+
+function moveComposerToBottom(){
+  if(chatting) return;
+  chatting = true; app.classList.add('chatting');
+  dockSlot.appendChild(document.getElementById('composer')); input.focus();
+}
+function addUser(t){ const e=document.createElement('div'); e.className='msg user';
+  e.innerHTML='<div class="bubble"></div>'; e.querySelector('.bubble').textContent=t;
+  conv.appendChild(e); scroll.scrollTop=scroll.scrollHeight; }
+function addAtlas(t){ const e=document.createElement('div'); e.className='msg atlas';
+  e.innerHTML='<div class="av">'+ORB+'</div><div class="body"></div>';
+  e.querySelector('.body').textContent=t; conv.appendChild(e);
+  scroll.scrollTop=scroll.scrollHeight; return e.querySelector('.body'); }
+function showThinking(){ const e=document.createElement('div'); e.className='thinking'; e.id='thinking';
+  e.innerHTML=ORB+'<div class="dots"><i></i><i></i><i></i></div>';
+  conv.appendChild(e); scroll.scrollTop=scroll.scrollHeight; }
+function clearThinking(){ const t=document.getElementById('thinking'); if(t) t.remove(); }
+
+/* ===== THE BRAIN — live. Calls your proxy at /api/chat, which
+   talks to Gemini using the key stored safely in Vercel.       ===== */
+async function askBrain(history){
+  const res = await fetch('/api/chat', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ messages: history })
+  });
+  if(!res.ok) throw new Error('offline');
+  const data = await res.json();
+  return data.reply;
+}
+
+async function send(){
+  const text = input.value.trim();
+  if(!text || busy) return;
+  busy = true; sendBtn.disabled = true;
+  moveComposerToBottom(); addUser(text);
+  history.push({ role:'user', content:text });
+  input.value=''; autosize(); showThinking();
+  try {
+    const reply = await askBrain(history);
+    clearThinking(); addAtlas(reply || "Came back empty on that one. Say it another way?");
+    history.push({ role:'assistant', content:reply });
+  } catch(e) {
+    clearThinking();
+    addAtlas("Lost the signal reaching my brain. Check the connection and try again.").style.color='var(--danger)';
+  } finally { busy=false; sendBtn.disabled=false; input.focus(); }
+}
+function autosize(){ input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,200)+'px'; }
+input.addEventListener('input', autosize);
+input.addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); }});
+sendBtn.addEventListener('click', send);
+document.querySelectorAll('.chip').forEach(c=>{
+  const fill=()=>{ input.value=c.dataset.prompt; autosize(); input.focus(); };
+  c.addEventListener('click', fill);
+  c.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); fill(); }});
+});
+document.getElementById('newChat').addEventListener('click', ()=>{
+  history=[]; conv.innerHTML=''; chatting=false; app.classList.remove('chatting','menu-open');
+  heroSlot.appendChild(document.getElementById('composer')); input.value=''; autosize(); input.focus();
+});
+const menuBtn=document.getElementById('menuBtn'), scrim=document.getElementById('scrim');
+menuBtn.addEventListener('click', ()=>app.classList.toggle('menu-open'));
+scrim.addEventListener('click', ()=>app.classList.remove('menu-open'));
+
+input.focus();
+</script>
+</body>
+</html>
