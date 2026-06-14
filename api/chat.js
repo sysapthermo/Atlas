@@ -32,7 +32,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { messages } = req.body || {};
+    const { messages, memory } = req.body || {};
     if (!Array.isArray(messages)) {
       return res.status(400).json({ error: "messages must be an array" });
     }
@@ -42,6 +42,26 @@ export default async function handler(req, res) {
       role: m.role === "assistant" ? "model" : "user",
       parts: [{ text: String(m.content || "") }],
     }));
+
+    // The model has no clock, so we tell it the real time each request.
+    // Change "America/New_York" if you're ever in a different timezone.
+    const now = new Date().toLocaleString("en-US", {
+      timeZone: "America/New_York",
+      weekday: "long", year: "numeric", month: "long", day: "numeric",
+      hour: "numeric", minute: "2-digit", hour12: true,
+    });
+    let systemText =
+      SYSTEM_PROMPT +
+      " The current date and time (US Eastern) is " + now +
+      ". Use this if asked about the time or date — never guess at it.";
+
+    // The user's saved memory notes, applied to every conversation.
+    if (memory && typeof memory === "string" && memory.trim()) {
+      systemText +=
+        "\n\nThe user has saved these notes about themselves and how they like you" +
+        " to respond. Treat them as the user's own preferences:\n" +
+        memory.trim().slice(0, 4000);
+    }
 
     const url =
       "https://generativelanguage.googleapis.com/v1beta/models/" +
@@ -54,7 +74,7 @@ export default async function handler(req, res) {
         "x-goog-api-key": KEY,
       },
       body: JSON.stringify({
-        system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        system_instruction: { parts: [{ text: systemText }] },
         contents,
         generationConfig: { maxOutputTokens: 1000, temperature: 0.8 },
       }),
