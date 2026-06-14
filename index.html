@@ -170,6 +170,13 @@
   .ritem:hover .del{opacity:1}
   .ritem .del:hover{color:var(--ink);background:rgba(255,255,255,0.08)}
   .rempty{font-size:12.5px;color:var(--faint);padding:6px 10px}
+  .memory{border-top:1px solid var(--line);padding-top:12px;margin-top:8px}
+  .memory .h{font-size:11px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--faint);padding:0 2px 8px}
+  .memory textarea{width:100%;resize:none;height:76px;background:var(--raised);border:1px solid var(--line-2);
+    border-radius:11px;color:var(--ink);font-family:var(--body);font-size:13px;line-height:1.45;padding:9px 11px;outline:none}
+  .memory textarea:focus{border-color:rgba(174,200,255,0.5)}
+  .memory textarea::placeholder{color:var(--faint)}
+  .memhint{font-size:10.5px;color:var(--faint);padding:6px 2px 0}
   .drawer-foot{border-top:1px solid var(--line);padding-top:12px;margin-top:8px}
   .profile{display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:11px}
   .pfp{width:30px;height:30px;border-radius:50%;flex:0 0 auto;
@@ -244,6 +251,11 @@
     <div class="recent">
       <div class="h">Recent</div>
       <div id="recentList"></div>
+    </div>
+    <div class="memory">
+      <div class="h">Memory</div>
+      <textarea id="memText" placeholder="What should Atlas always remember? Your name, what you build, how you like answers..."></textarea>
+      <div class="memhint">Saved automatically · applies to every chat</div>
     </div>
     <div class="drawer-foot">
       <div class="profile">
@@ -378,8 +390,9 @@ function typeAtlas(text){
 
 /* ===== brain — calls your proxy at /api/chat ===== */
 async function askBrain(history){
+  let memory=''; try{ memory=localStorage.getItem('atlas.memory')||''; }catch(e){}
   const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({messages:history})});
+    body:JSON.stringify({messages:history, memory})});
   if(!res.ok) throw new Error('offline');
   const data=await res.json(); return data.reply;
 }
@@ -423,6 +436,10 @@ document.getElementById('histBtn').addEventListener('click', openDrawer);
 document.getElementById('closeBtn').addEventListener('click', closeDrawer);
 scrim.addEventListener('click', closeDrawer);
 addEventListener('keydown', e=>{ if(e.key==='Escape') closeDrawer(); });
+
+const memText=document.getElementById('memText');
+try{ memText.value=localStorage.getItem('atlas.memory')||''; }catch(e){}
+memText.addEventListener('input',()=>{ try{ localStorage.setItem('atlas.memory', memText.value); }catch(e){} });
 
 renderRecents();
 input.focus();
