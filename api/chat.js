@@ -1,14 +1,12 @@
 // ============================================================
-//  api/chat.js  —  Atlas's secure bridge to Gemini
+//  api/chat.js  —  Atlas's streaming bridge to Gemini (Edge)
 //  ------------------------------------------------------------
-//  This runs on Vercel's servers, never in the browser. Your
-//  API key lives in a Vercel Environment Variable called
-//  GEMINI_API_KEY and is read here with process.env — so the
-//  key is never exposed to anyone who opens your site.
-//
-//  Atlas's personality lives in SYSTEM_PROMPT below. Edit that
-//  text to change who Atlas is, then redeploy.
+//  Runs on Vercel's Edge runtime so it can STREAM the reply
+//  back token-by-token. Your API key stays here (read from the
+//  GEMINI_API_KEY environment variable) and never reaches the
+//  browser. Atlas's personality lives in SYSTEM_PROMPT below.
 // ============================================================
+export const config = { runtime: "edge" };
 
 const SYSTEM_PROMPT =
   "You are Atlas, a personal AI assistant with the poise of a seasoned flight engineer. " +
@@ -17,97 +15,92 @@ const SYSTEM_PROMPT =
   "Anticipate the next step and offer it. Speak plainly and precisely, like someone very good at their " +
   "job with nothing to prove. Keep answers concise unless depth is asked for. No emoji unless the user uses them first.";
 
-// Which Gemini model to use. gemini-2.5-flash is free-tier and stable.
-// Swap to a newer one (e.g. gemini-3.5-flash) anytime by changing this line.
+// gemini-2.5-flash is free-tier and stable. Swap to a newer one anytime.
 const MODEL = "gemini-2.5-flash";
 
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Use POST" });
-  }
+function json(obj, status) {
+  return new Response(JSON.stringify(obj), {
+    status: status || 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+export default async function handler(req) {
+  if (req.method !== "POST") return json({ error: "Use POST" }, 405);
 
   const KEY = process.env.GEMINI_API_KEY;
-  if (!KEY) {
-    return res.status(500).json({ error: "GEMINI_API_KEY is not set in Vercel." });
+  if (!KEY) return json({ error: "GEMINI_API_KEY is not set in Vercel." }, 500);
+
+  let body;
+  try { body = await req.json(); } catch (e) { return json({ error: "Bad JSON" }, 400); }
+
+  const { messages, memory, search } = body || {};
+  if (!Array.isArray(messages)) return json({ error: "messages must be an array" }, 400);
+
+  // The model has no clock, so we tell it the real Eastern time each request.
+  const now = new Date().toLocaleString("en-US", {
+    timeZone: "America/New_York",
+    weekday: "long", year: "numeric", month: "long", day: "numeric",
+    hour: "numeric", minute: "2-digit", hour12: true,
+  });
+  let systemText =
+    SYSTEM_PROMPT +
+    " The current date and time (US Eastern) is " + now +
+    ". Use this if asked about the time or date — never guess at it.";
+
+  // The user's saved memory notes, applied to every conversation.
+  if (memory && typeof memory === "string" && memory.trim()) {
+    systemText +=
+      "\n\nThe user has saved these notes about themselves and how they like you" +
+      " to respond. Treat them as the user's own preferences:\n" +
+      memory.trim().slice(0, 4000);
   }
 
+  // Each message can carry text and/or an attached file (image or PDF).
+  const contents = messages.map((m) => {
+    const parts = [];
+    if (m.content) parts.push({ text: String(m.content) });
+    if (m.file && m.file.data && m.file.mime_type) {
+      parts.push({ inline_data: { mime_type: m.file.mime_type, data: m.file.data } });
+    }
+    if (!parts.length) parts.push({ text: "" });
+    return { role: m.role === "assistant" ? "model" : "user", parts };
+  });
+
+  const reqBody = {
+    system_instruction: { parts: [{ text: systemText }] },
+    contents,
+    generationConfig: { maxOutputTokens: 1000, temperature: 0.8 },
+  };
+  // Only ground on live web results when the user turns search on.
+  if (search === true) reqBody.tools = [{ google_search: {} }];
+
+  const url =
+    "https://generativelanguage.googleapis.com/v1beta/models/" +
+    MODEL + ":streamGenerateContent?alt=sse";
+
+  let upstream;
   try {
-    const { messages, memory, search } = req.body || {};
-    if (!Array.isArray(messages)) {
-      return res.status(400).json({ error: "messages must be an array" });
-    }
-
-    // Gemini calls the assistant "model" instead of "assistant".
-    // Each message can carry text and/or an attached file (image or PDF).
-    const contents = messages.map((m) => {
-      const parts = [];
-      if (m.content) parts.push({ text: String(m.content) });
-      if (m.file && m.file.data && m.file.mime_type) {
-        parts.push({ inline_data: { mime_type: m.file.mime_type, data: m.file.data } });
-      }
-      if (!parts.length) parts.push({ text: "" });
-      return { role: m.role === "assistant" ? "model" : "user", parts };
-    });
-
-    // The model has no clock, so we tell it the real time each request.
-    // Change "America/New_York" if you're ever in a different timezone.
-    const now = new Date().toLocaleString("en-US", {
-      timeZone: "America/New_York",
-      weekday: "long", year: "numeric", month: "long", day: "numeric",
-      hour: "numeric", minute: "2-digit", hour12: true,
-    });
-    let systemText =
-      SYSTEM_PROMPT +
-      " The current date and time (US Eastern) is " + now +
-      ". Use this if asked about the time or date — never guess at it.";
-
-    // The user's saved memory notes, applied to every conversation.
-    if (memory && typeof memory === "string" && memory.trim()) {
-      systemText +=
-        "\n\nThe user has saved these notes about themselves and how they like you" +
-        " to respond. Treat them as the user's own preferences:\n" +
-        memory.trim().slice(0, 4000);
-    }
-
-    const url =
-      "https://generativelanguage.googleapis.com/v1beta/models/" +
-      MODEL + ":generateContent";
-
-    const reqBody = {
-      system_instruction: { parts: [{ text: systemText }] },
-      contents,
-      generationConfig: { maxOutputTokens: 1000, temperature: 0.8 },
-    };
-    // Only ground on live web results when the user turns search on.
-    if (search === true) reqBody.tools = [{ google_search: {} }];
-
-    const r = await fetch(url, {
+    upstream = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": KEY,
-      },
+      headers: { "Content-Type": "application/json", "x-goog-api-key": KEY },
       body: JSON.stringify(reqBody),
     });
-
-    if (!r.ok) {
-      const detail = await r.text();
-      return res.status(502).json({ error: "Gemini error", detail });
-    }
-
-    const data = await r.json();
-    const reply =
-      (data.candidates &&
-        data.candidates[0] &&
-        data.candidates[0].content &&
-        data.candidates[0].content.parts
-          .map((p) => p.text)
-          .filter(Boolean)
-          .join("\n")
-          .trim()) || "";
-
-    return res.status(200).json({ reply });
   } catch (e) {
-    return res.status(500).json({ error: "Proxy crashed", detail: String(e) });
+    return json({ error: "Could not reach Gemini", detail: String(e) }, 502);
   }
+
+  if (!upstream.ok || !upstream.body) {
+    const detail = await upstream.text().catch(() => "");
+    return json({ error: "Gemini error", detail }, 502);
+  }
+
+  // Pipe Gemini's Server-Sent Events straight back to the browser.
+  return new Response(upstream.body, {
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      "Connection": "keep-alive",
+    },
+  });
 }
