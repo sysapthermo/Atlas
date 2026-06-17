@@ -70,7 +70,11 @@ export default async function handler(req) {
   const reqBody = {
     system_instruction: { parts: [{ text: systemText }] },
     contents,
-    generationConfig: { maxOutputTokens: 1000, temperature: 0.8 },
+    generationConfig: {
+      maxOutputTokens: 8192,            // room for long answers / full scripts
+      temperature: 0.8,
+      thinkingConfig: { thinkingBudget: 0 }, // no silent "thinking" eating the budget
+    },
   };
   // Only ground on live web results when the user turns search on.
   if (search === true) reqBody.tools = [{ google_search: {} }];
