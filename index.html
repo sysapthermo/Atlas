@@ -203,6 +203,14 @@
   .memory textarea:focus{border-color:rgba(174,200,255,0.5)}
   .memory textarea::placeholder{color:var(--faint)}
   .memhint{font-size:10.5px;color:var(--faint);padding:6px 2px 0}
+  .memory .syncin{width:100%;background:var(--raised);border:1px solid var(--line-2);border-radius:11px;
+    color:var(--ink);font-family:var(--body);font-size:13px;padding:9px 11px;outline:none}
+  .memory .syncin:focus{border-color:rgba(174,200,255,0.5)}
+  .memory .syncin::placeholder{color:var(--faint)}
+  .syncrow{display:flex;align-items:center;gap:10px;margin-top:8px}
+  .syncbtn{font-size:12.5px;font-weight:500;color:var(--ink);background:var(--raised);border:1px solid var(--line-2);
+    border-radius:9px;padding:7px 13px;cursor:pointer;transition:border-color .15s}
+  .syncbtn:hover{border-color:var(--glow)}
   .drawer-foot{border-top:1px solid var(--line);padding-top:12px;margin-top:8px}
   .profile{display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:11px}
   .pfp{width:30px;height:30px;border-radius:50%;flex:0 0 auto;
@@ -286,6 +294,12 @@
       <textarea id="memText" placeholder="What should Atlas always remember? Your name, what you build, how you like answers..."></textarea>
       <div class="memhint">Saved automatically · applies to every chat</div>
     </div>
+    <div class="memory">
+      <div class="h">Sync across devices</div>
+      <input id="syncCode" class="syncin" type="text" placeholder="Secret sync code" />
+      <div class="syncrow"><button class="syncbtn" id="syncBtn">Sync now</button><span class="memhint" id="syncStat" style="padding:0"></span></div>
+      <div class="memhint">Use the same code on each device. Keep it private.</div>
+    </div>
     <div class="drawer-foot">
       <div class="profile">
         <div class="pfp">B</div>
@@ -329,7 +343,12 @@ let input=document.getElementById('input'), sendBtn=document.getElementById('sen
 const attachBtn=document.getElementById('attachBtn'), searchBtn=document.getElementById('searchBtn'),
       fileInput=document.getElementById('fileInput'), micBtn=document.getElementById('micBtn'),
       voiceBtn=document.getElementById('voiceBtn');
-let history=[], busy=false, chatting=false, pendingFile=null, searchOn=false;
+let history=[], busy=false, chatting=false, pendingFile=null, searchOn=false, abortCtrl=null;
+const SEND_ICON='<svg viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
+const STOP_ICON='<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none"/></svg>';
+function setBusy(b){ busy=b;
+  if(b){ sendBtn.classList.add('is-stop'); sendBtn.innerHTML=STOP_ICON; sendBtn.setAttribute('aria-label','Stop'); }
+  else { sendBtn.classList.remove('is-stop'); sendBtn.innerHTML=SEND_ICON; sendBtn.setAttribute('aria-label','Send message'); } }
 
 /* ===== memory: save chats to the browser so they survive a refresh ===== */
 let currentId=null;
@@ -385,6 +404,7 @@ function openChat(id){
 function deleteChat(id){
   saveChats(loadChats().filter(c=>c.id!==id));
   if(id===currentId) newChat(); else renderRecents();
+  pushSync();
 }
 
 (function(){ const h=new Date().getHours();
@@ -433,10 +453,10 @@ function addAtlasEmpty(){ const e=document.createElement('div'); e.className='ms
 
 /* ===== brain — calls your proxy at /api/chat ===== */
 /* ===== brain — streams the reply from /api/chat as it's generated ===== */
-async function streamReply(history, onText){
+async function streamReply(history, onText, signal){
   let memory=''; try{ memory=localStorage.getItem('atlas.memory')||''; }catch(e){}
   const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({messages:history, memory, search:searchOn})});
+    body:JSON.stringify({messages:history, memory, search:searchOn}), signal});
   if(!res.ok || !res.body){
     let m=''; try{ const d=await res.json(); m=d.error||d.detail||''; }catch(e){}
     throw new Error(m||'offline');
@@ -463,35 +483,35 @@ async function streamReply(history, onText){
 
 async function send(){
   const text=input.value.trim(); if((!text && !pendingFile)||busy) return;
-  busy=true; sendBtn.disabled=true;
+  setBusy(true);
   if('speechSynthesis' in window) speechSynthesis.cancel();
   moveComposerToBottom();
   const file=pendingFile;
   addUser(text, file);
   history.push(file ? {role:'user',content:text,file} : {role:'user',content:text});
   clearAttach(); input.value=''; autosize(); showThinking();
+  abortCtrl=new AbortController();
   let body=null, full='';
   try{
-    full=await streamReply(history,(text)=>{
+    await streamReply(history,(t)=>{ full=t;
       if(!body){ clearThinking(); body=addAtlasEmpty(); }
-      body.textContent=text; scroll.scrollTop=scroll.scrollHeight;
-    });
+      body.textContent=t; scroll.scrollTop=scroll.scrollHeight; }, abortCtrl.signal);
     if(!body){ clearThinking(); body=addAtlasEmpty(); }
     renderInto(body, full||"Came back empty on that one. Say it another way?");
     scroll.scrollTop=scroll.scrollHeight;
-    history.push({role:'assistant',content:full}); persist(); speak(full);
+    history.push({role:'assistant',content:full||''}); persist(); speak(full);
   }catch(e){
+    const stopped = e && (e.name==='AbortError' || /abort/i.test(String(e.message||'')));
     clearThinking();
-    if(body){ renderInto(body, full); }
-    else { addAtlas("Lost the signal reaching my brain. Check the connection and try again.").style.color='var(--danger)'; }
-    persist();
-  }finally{ busy=false; sendBtn.disabled=false; input.focus(); }
+    if(body){ renderInto(body, full); history.push({role:'assistant',content:full}); persist(); }
+    else if(!stopped){ addAtlas("Lost the signal reaching my brain. Check the connection and try again.").style.color='var(--danger)'; }
+  }finally{ setBusy(false); abortCtrl=null; pushSync(); input.focus(); }
 }
 function autosize(){ input.style.height='auto'; const h=Math.min(input.scrollHeight,200);
   input.style.height=h+'px'; input.style.overflowY=input.scrollHeight>200?'auto':'hidden'; }
 input.addEventListener('input', autosize);
 input.addEventListener('keydown', e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); send(); }});
-sendBtn.addEventListener('click', send);
+sendBtn.addEventListener('click', ()=>{ if(busy){ if(abortCtrl) abortCtrl.abort(); } else send(); });
 document.querySelectorAll('.chip').forEach(c=>{
   const fill=()=>{ input.value=c.dataset.prompt; autosize(); input.focus(); };
   c.addEventListener('click', fill);
@@ -585,7 +605,38 @@ addEventListener('keydown', e=>{ if(e.key==='Escape') closeDrawer(); });
 
 const memText=document.getElementById('memText');
 try{ memText.value=localStorage.getItem('atlas.memory')||''; }catch(e){}
-memText.addEventListener('input',()=>{ try{ localStorage.setItem('atlas.memory', memText.value); }catch(e){} });
+memText.addEventListener('input',()=>{ try{ localStorage.setItem('atlas.memory', memText.value); }catch(e){} pushSync(); });
+
+/* ===== cross-device sync via a shared secret code ===== */
+const SYNC_KEY='atlas.sync';
+const syncCode=document.getElementById('syncCode'), syncBtn=document.getElementById('syncBtn');
+function getCode(){ try{ return (localStorage.getItem(SYNC_KEY)||'').trim(); }catch(e){ return ''; } }
+function setSyncStat(t){ const s=document.getElementById('syncStat'); if(s) s.textContent=t; }
+function localBlob(){ let mem=''; try{ mem=localStorage.getItem('atlas.memory')||''; }catch(e){}
+  return { chats:loadChats(), memory:mem, updatedAt:Date.now() }; }
+let pushTimer=null;
+function pushSync(){ const code=getCode(); if(!code) return;
+  clearTimeout(pushTimer);
+  pushTimer=setTimeout(async()=>{ try{ setSyncStat('Saving...');
+    await fetch('/api/sync',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'save',code,data:localBlob()})});
+    setSyncStat('Synced'); }catch(e){ setSyncStat('Sync failed'); } }, 900); }
+async function pullSync(){ const code=getCode(); if(!code) return;
+  try{ setSyncStat('Loading...');
+    const r=await fetch('/api/sync',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'load',code})});
+    const j=await r.json();
+    if(j&&j.error){ setSyncStat(j.error); return; }
+    if(j&&j.data&&Array.isArray(j.data.chats)){
+      saveChats(j.data.chats);
+      if(typeof j.data.memory==='string'){ try{ localStorage.setItem('atlas.memory',j.data.memory); }catch(e){} if(memText) memText.value=j.data.memory; }
+      renderRecents(); setSyncStat('Synced');
+    } else { setSyncStat('Saving this device to the cloud...'); pushSync(); }
+  }catch(e){ setSyncStat('Sync failed'); } }
+syncCode.value=getCode();
+syncCode.addEventListener('input',()=>{ try{ localStorage.setItem(SYNC_KEY, syncCode.value.trim()); }catch(e){} });
+syncBtn.addEventListener('click',()=>{ try{ localStorage.setItem(SYNC_KEY, syncCode.value.trim()); }catch(e){} pullSync(); });
+if(getCode()) pullSync();
 
 if('serviceWorker' in navigator){ addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{})); }
 
