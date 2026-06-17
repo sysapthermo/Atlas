@@ -4,6 +4,12 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Atlas</title>
+<link rel="manifest" href="/manifest.json" />
+<meta name="theme-color" content="#0A0C10" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Atlas" />
+<link rel="apple-touch-icon" href="/icon-192.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=Inter:wght@400;450;500;600&display=swap" rel="stylesheet" />
@@ -421,31 +427,38 @@ function showThinking(){ const e=document.createElement('div'); e.className='thi
   conv.appendChild(e); scroll.scrollTop=scroll.scrollHeight; }
 function clearThinking(){ const t=document.getElementById('thinking'); if(t) t.remove(); }
 
-/* types the reply out live, then swaps in formatted markdown */
-function typeAtlas(text){
-  return new Promise(resolve=>{
-    const e=document.createElement('div'); e.className='msg atlas';
-    e.innerHTML='<div class="av">'+ORB+'</div><div class="body"></div>';
-    const body=e.querySelector('.body'); conv.appendChild(e);
-    const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if(reduce || !text){ renderInto(body,text); scroll.scrollTop=scroll.scrollHeight; return resolve(); }
-    let i=0;
-    (function step(){
-      i+=3; body.textContent=text.slice(0,i);
-      scroll.scrollTop=scroll.scrollHeight;
-      if(i<text.length){ setTimeout(step,12); }
-      else { renderInto(body,text); scroll.scrollTop=scroll.scrollHeight; resolve(); }
-    })();
-  });
-}
+function addAtlasEmpty(){ const e=document.createElement('div'); e.className='msg atlas';
+  e.innerHTML='<div class="av">'+ORB+'</div><div class="body"></div>';
+  conv.appendChild(e); scroll.scrollTop=scroll.scrollHeight; return e.querySelector('.body'); }
 
 /* ===== brain — calls your proxy at /api/chat ===== */
-async function askBrain(history){
+/* ===== brain — streams the reply from /api/chat as it's generated ===== */
+async function streamReply(history, onText){
   let memory=''; try{ memory=localStorage.getItem('atlas.memory')||''; }catch(e){}
   const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({messages:history, memory, search:searchOn})});
-  if(!res.ok) throw new Error('offline');
-  const data=await res.json(); return data.reply;
+  if(!res.ok || !res.body){
+    let m=''; try{ const d=await res.json(); m=d.error||d.detail||''; }catch(e){}
+    throw new Error(m||'offline');
+  }
+  const reader=res.body.getReader(), dec=new TextDecoder();
+  let buf='', full='';
+  while(true){
+    const {value,done}=await reader.read(); if(done) break;
+    buf+=dec.decode(value,{stream:true});
+    let nl;
+    while((nl=buf.indexOf('\n'))>=0){
+      const line=buf.slice(0,nl).trim(); buf=buf.slice(nl+1);
+      if(!line.startsWith('data:')) continue;
+      const p=line.slice(5).trim();
+      if(!p || p==='[DONE]') continue;
+      try{ const o=JSON.parse(p);
+        const parts=o&&o.candidates&&o.candidates[0]&&o.candidates[0].content&&o.candidates[0].content.parts;
+        if(parts){ const t=parts.map(x=>x.text||'').join(''); if(t){ full+=t; onText(full); } }
+      }catch(e){}
+    }
+  }
+  return full;
 }
 
 async function send(){
@@ -457,11 +470,20 @@ async function send(){
   addUser(text, file);
   history.push(file ? {role:'user',content:text,file} : {role:'user',content:text});
   clearAttach(); input.value=''; autosize(); showThinking();
-  try{ const reply=await askBrain(history); clearThinking();
-    await typeAtlas(reply||"Came back empty on that one. Say it another way?");
-    history.push({role:'assistant',content:reply}); persist(); speak(reply);
-  }catch(e){ clearThinking();
-    addAtlas("Lost the signal reaching my brain. Check the connection and try again.").style.color='var(--danger)';
+  let body=null, full='';
+  try{
+    full=await streamReply(history,(text)=>{
+      if(!body){ clearThinking(); body=addAtlasEmpty(); }
+      body.textContent=text; scroll.scrollTop=scroll.scrollHeight;
+    });
+    if(!body){ clearThinking(); body=addAtlasEmpty(); }
+    renderInto(body, full||"Came back empty on that one. Say it another way?");
+    scroll.scrollTop=scroll.scrollHeight;
+    history.push({role:'assistant',content:full}); persist(); speak(full);
+  }catch(e){
+    clearThinking();
+    if(body){ renderInto(body, full); }
+    else { addAtlas("Lost the signal reaching my brain. Check the connection and try again.").style.color='var(--danger)'; }
     persist();
   }finally{ busy=false; sendBtn.disabled=false; input.focus(); }
 }
@@ -564,6 +586,8 @@ addEventListener('keydown', e=>{ if(e.key==='Escape') closeDrawer(); });
 const memText=document.getElementById('memText');
 try{ memText.value=localStorage.getItem('atlas.memory')||''; }catch(e){}
 memText.addEventListener('input',()=>{ try{ localStorage.setItem('atlas.memory', memText.value); }catch(e){} });
+
+if('serviceWorker' in navigator){ addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{})); }
 
 renderRecents();
 input.focus();
