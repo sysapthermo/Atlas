@@ -147,6 +147,9 @@
   .tool:focus-visible{outline:2px solid var(--glow);outline-offset:2px}
   .tool svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
   .tool.active{background:rgba(174,200,255,0.16);color:var(--glow)}
+  .tool.listening{background:rgba(255,130,120,0.18);color:#ff9a8c;animation:micpulse 1.3s ease-in-out infinite}
+  @keyframes micpulse{0%,100%{box-shadow:0 0 0 0 rgba(255,130,120,0.4)}50%{box-shadow:0 0 0 7px rgba(255,130,120,0)}}
+  .ico.active{background:rgba(174,200,255,0.16);color:var(--glow);border-color:transparent}
   .attach-row{display:flex;flex-wrap:wrap;gap:8px;padding:0 4px 8px}
   .attach-row:empty{display:none}
   .apreview{display:flex;align-items:center;gap:8px;background:var(--raised);border:1px solid var(--line-2);
@@ -204,7 +207,7 @@
 
   @media (max-width:560px){ .hero h1{font-size:29px} .brand .stat{display:none} }
   @media (prefers-reduced-motion: reduce){
-    .orb,.orb.ring::after,.hero>*,.hero .orb,.msg{animation:none !important}
+    .orb,.orb.ring::after,.hero>*,.hero .orb,.msg,.tool.listening{animation:none !important}
     .drawer,.scrim{transition:none !important}
   }
 </style>
@@ -224,6 +227,9 @@
         <span class="stat"><span class="d"></span>Gemini</span>
       </div>
       <div class="controls">
+        <button class="ico" id="voiceBtn" aria-label="Read replies aloud" title="Read replies aloud">
+          <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>
+        </button>
         <button class="ico" id="newBtn" aria-label="New chat" title="New chat">
           <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
@@ -290,6 +296,9 @@
           <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a5 5 0 0 1-7.07-7.07l9.19-9.19a3 3 0 0 1 4.24 4.24l-9.2 9.19a1 1 0 0 1-1.41-1.41l8.49-8.49"/></svg>
         </button>
         <textarea id="input" rows="1" placeholder="Ask Atlas anything"></textarea>
+        <button class="tool" id="micBtn" aria-label="Speak" title="Speak">
+          <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        </button>
         <button class="tool" id="searchBtn" aria-label="Toggle web search" title="Web search">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
         </button>
@@ -312,7 +321,8 @@ const app=document.getElementById('app'), conv=document.getElementById('conv'),
 heroSlot.appendChild(document.getElementById('composerTpl').content.cloneNode(true));
 let input=document.getElementById('input'), sendBtn=document.getElementById('send');
 const attachBtn=document.getElementById('attachBtn'), searchBtn=document.getElementById('searchBtn'),
-      fileInput=document.getElementById('fileInput');
+      fileInput=document.getElementById('fileInput'), micBtn=document.getElementById('micBtn'),
+      voiceBtn=document.getElementById('voiceBtn');
 let history=[], busy=false, chatting=false, pendingFile=null, searchOn=false;
 
 /* ===== memory: save chats to the browser so they survive a refresh ===== */
@@ -441,6 +451,7 @@ async function askBrain(history){
 async function send(){
   const text=input.value.trim(); if((!text && !pendingFile)||busy) return;
   busy=true; sendBtn.disabled=true;
+  if('speechSynthesis' in window) speechSynthesis.cancel();
   moveComposerToBottom();
   const file=pendingFile;
   addUser(text, file);
@@ -448,7 +459,7 @@ async function send(){
   clearAttach(); input.value=''; autosize(); showThinking();
   try{ const reply=await askBrain(history); clearThinking();
     await typeAtlas(reply||"Came back empty on that one. Say it another way?");
-    history.push({role:'assistant',content:reply}); persist();
+    history.push({role:'assistant',content:reply}); persist(); speak(reply);
   }catch(e){ clearThinking();
     addAtlas("Lost the signal reaching my brain. Check the connection and try again.").style.color='var(--danger)';
     persist();
@@ -493,6 +504,50 @@ fileInput.addEventListener('change', async ()=>{
   }catch(e){ alert("Couldn't read that file. Try another one."); }
 });
 searchBtn.addEventListener('click', ()=>{ searchOn=!searchOn; searchBtn.classList.toggle('active', searchOn); });
+
+/* ===== voice: talk to Atlas (speech-to-text) and hear it (text-to-speech) ===== */
+// 1) Speech-to-text via the browser's speech recognition.
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recog=null, listening=false;
+if(SR){
+  recog=new SR(); recog.lang='en-US'; recog.interimResults=true; recog.continuous=false;
+  recog.onresult=(e)=>{ let t=''; for(let i=0;i<e.results.length;i++) t+=e.results[i][0].transcript;
+    input.value=t; autosize(); };
+  recog.onend=()=>{ listening=false; micBtn.classList.remove('listening'); input.focus(); };
+  recog.onerror=()=>{ listening=false; micBtn.classList.remove('listening'); };
+  micBtn.addEventListener('click', ()=>{
+    if(listening){ recog.stop(); return; }
+    try{ input.value=''; recog.start(); listening=true; micBtn.classList.add('listening'); }catch(e){}
+  });
+} else { micBtn.style.display='none'; }   // hide if the browser can't listen
+
+// 2) Text-to-speech: read Atlas's replies aloud when toggled on.
+let speakOn=false; try{ speakOn=localStorage.getItem('atlas.voice')==='1'; }catch(e){}
+const canSpeak = 'speechSynthesis' in window;
+if(canSpeak){ voiceBtn.classList.toggle('active', speakOn); }
+else { voiceBtn.style.display='none'; }
+voiceBtn.addEventListener('click', ()=>{
+  speakOn=!speakOn; voiceBtn.classList.toggle('active', speakOn);
+  try{ localStorage.setItem('atlas.voice', speakOn?'1':'0'); }catch(e){}
+  if(!speakOn && canSpeak) speechSynthesis.cancel();
+});
+function cleanForSpeech(t){
+  return String(t).replace(/```[\s\S]*?```/g,' (code) ').replace(/`([^`]+)`/g,'$1')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g,'').replace(/\[([^\]]+)\]\([^)]*\)/g,'$1')
+    .replace(/[#>*_~|]/g,'').replace(/\n{2,}/g,'. ').trim();
+}
+function speak(t){
+  if(!speakOn || !canSpeak || !t) return;
+  try{ speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(cleanForSpeech(t).slice(0,2000));
+    u.lang='en-US'; u.rate=1.0; u.pitch=1.0;
+    const vs=speechSynthesis.getVoices();
+    const v=vs.find(v=>/en[-_]US/i.test(v.lang)&&/Google|Natural|Samantha|Aaron/i.test(v.name))
+          || vs.find(v=>/^en/i.test(v.lang));
+    if(v) u.voice=v;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
 
 document.getElementById('newBtn').addEventListener('click', newChat);
 document.getElementById('newChat').addEventListener('click', newChat);
