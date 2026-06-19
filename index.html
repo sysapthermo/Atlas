@@ -222,6 +222,19 @@
   .syncbtn{font-size:12.5px;font-weight:500;color:var(--ink);background:var(--raised);border:1px solid var(--line-2);
     border-radius:9px;padding:7px 13px;cursor:pointer;transition:border-color .15s}
   .syncbtn:hover{border-color:var(--glow)}
+  #gate{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px}
+  .gate-card{display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;max-width:340px}
+  .gate-card .orb{margin-bottom:6px}
+  .gate-title{font-family:var(--display);font-weight:600;font-size:30px;letter-spacing:-0.4px}
+  .gate-sub{color:var(--muted);font-size:14.5px;line-height:1.5}
+  .gbtn{display:inline-flex;align-items:center;gap:11px;margin-top:6px;font-family:var(--body);font-size:14.5px;
+    font-weight:500;color:#1f1f1f;background:#fff;border:none;border-radius:12px;padding:12px 20px;cursor:pointer;transition:transform .12s,box-shadow .15s}
+  .gbtn:hover{transform:translateY(-1px);box-shadow:0 8px 22px -10px rgba(0,0,0,0.6)}
+  .gbtn svg{width:18px;height:18px}
+  .gateErr{color:var(--danger);font-size:12.5px;min-height:14px;max-width:300px}
+  .signout{flex:0 0 auto;font-size:12px;color:var(--muted);background:transparent;border:1px solid var(--line-2);
+    border-radius:8px;padding:6px 11px;cursor:pointer;transition:border-color .15s,color .15s}
+  .signout:hover{border-color:var(--glow);color:var(--ink)}
   .drawer-foot{border-top:1px solid var(--line);padding-top:12px;margin-top:8px}
   .profile{display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:11px}
   .pfp{width:30px;height:30px;border-radius:50%;flex:0 0 auto;
@@ -240,9 +253,39 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.9/purify.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
+  /* PASTE YOUR FIREBASE CONFIG BELOW.
+     Firebase Console -> Project settings -> "Your apps" (web app) -> Config.
+     These values are NOT secret — they're safe in the page. Real security comes
+     from your Firestore rules + Authorized domains, which you set in the console. */
+  window.ATLAS_FIREBASE_CONFIG = {
+    apiKey: "AIzaSyAsd25F59sPG9Kf5WDU_jzFLHcAK5mg_DM",
+    authDomain: "atlas-5b1b0.firebaseapp.com",
+    projectId: "atlas-5b1b0",
+    storageBucket: "atlas-5b1b0.firebasestorage.app",
+    messagingSenderId: "72476151439",
+    appId: "1:72476151439:web:4d01b3eb1929a4a57ceafa"
+  };
+</script>
 </head>
 <body>
   <div class="ambient"></div>
+
+  <div id="gate">
+    <div class="gate-card">
+      <span class="orb ring" style="--d:64px"></span>
+      <div class="gate-title">Atlas</div>
+      <div class="gate-sub">Sign in to open your own private Atlas.</div>
+      <button id="googleBtn" class="gbtn">
+        <svg viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.9 2.4 30.4 0 24 0 14.6 0 6.4 5.4 2.6 13.3l7.9 6.1C12.3 13.2 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.6c0-1.6-.1-2.8-.4-4H24v7.6h12.7c-.3 2.1-1.6 5.2-4.6 7.3l7.1 5.5c4.2-3.9 6.9-9.6 6.9-16.4z"/><path fill="#FBBC05" d="M10.5 28.6c-.5-1.5-.8-3-.8-4.6s.3-3.1.8-4.6l-7.9-6.1C1 16.5 0 20.1 0 24s1 7.5 2.6 10.7l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.1-5.5c-2 1.4-4.6 2.3-8.8 2.3-6.3 0-11.7-3.7-13.5-9.4l-7.9 6.1C6.4 42.6 14.6 48 24 48z"/></svg>
+        Continue with Google
+      </button>
+      <div class="gateErr" id="gateErr"></div>
+    </div>
+  </div>
 
   <div class="app" id="app">
     <header class="bar">
@@ -305,16 +348,11 @@
       <textarea id="memText" placeholder="What should Atlas always remember? Your name, what you build, how you like answers..."></textarea>
       <div class="memhint">Saved automatically · applies to every chat</div>
     </div>
-    <div class="memory">
-      <div class="h">Sync across devices</div>
-      <input id="syncCode" class="syncin" type="text" placeholder="Secret sync code" />
-      <div class="syncrow"><button class="syncbtn" id="syncBtn">Sync now</button><span class="memhint" id="syncStat" style="padding:0"></span></div>
-      <div class="memhint">Use the same code on each device. Keep it private.</div>
-    </div>
     <div class="drawer-foot">
       <div class="profile">
-        <div class="pfp">B</div>
-        <div><div class="n">Beast</div><div class="p">Free plan</div></div>
+        <div class="pfp" id="pfp">?</div>
+        <div style="flex:1;min-width:0"><div class="n" id="acctName">Not signed in</div><div class="p" id="acctEmail"></div></div>
+        <button class="signout" id="signOut">Sign out</button>
       </div>
     </div>
   </aside>
@@ -707,36 +745,63 @@ const memText=document.getElementById('memText');
 try{ memText.value=localStorage.getItem('atlas.memory')||''; }catch(e){}
 memText.addEventListener('input',()=>{ try{ localStorage.setItem('atlas.memory', memText.value); }catch(e){} pushSync(); });
 
-/* ===== cross-device sync via a shared secret code ===== */
-const SYNC_KEY='atlas.sync';
-const syncCode=document.getElementById('syncCode'), syncBtn=document.getElementById('syncBtn');
-function getCode(){ try{ return (localStorage.getItem(SYNC_KEY)||'').trim(); }catch(e){ return ''; } }
-function setSyncStat(t){ const s=document.getElementById('syncStat'); if(s) s.textContent=t; }
+/* ===== accounts: Google sign-in (Firebase Auth) + private per-user data (Firestore) ===== */
+let currentUser=null, saveTimer=null;
 function localBlob(){ let mem=''; try{ mem=localStorage.getItem('atlas.memory')||''; }catch(e){}
   return { chats:loadChats(), memory:mem, updatedAt:Date.now() }; }
-let pushTimer=null;
-function pushSync(){ const code=getCode(); if(!code) return;
-  clearTimeout(pushTimer);
-  pushTimer=setTimeout(async()=>{ try{ setSyncStat('Saving...');
-    await fetch('/api/sync',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({action:'save',code,data:localBlob()})});
-    setSyncStat('Synced'); }catch(e){ setSyncStat('Sync failed'); } }, 900); }
-async function pullSync(){ const code=getCode(); if(!code) return;
-  try{ setSyncStat('Loading...');
-    const r=await fetch('/api/sync',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({action:'load',code})});
-    const j=await r.json();
-    if(j&&j.error){ setSyncStat(j.error); return; }
-    if(j&&j.data&&Array.isArray(j.data.chats)){
-      saveChats(j.data.chats);
-      if(typeof j.data.memory==='string'){ try{ localStorage.setItem('atlas.memory',j.data.memory); }catch(e){} if(memText) memText.value=j.data.memory; }
-      renderRecents(); setSyncStat('Synced');
-    } else { setSyncStat('Saving this device to the cloud...'); pushSync(); }
-  }catch(e){ setSyncStat('Sync failed'); } }
-syncCode.value=getCode();
-syncCode.addEventListener('input',()=>{ try{ localStorage.setItem(SYNC_KEY, syncCode.value.trim()); }catch(e){} });
-syncBtn.addEventListener('click',()=>{ try{ localStorage.setItem(SYNC_KEY, syncCode.value.trim()); }catch(e){} pullSync(); });
-if(getCode()) pullSync();
+
+/* write THIS user's data to their own private Firestore document (debounced) */
+function pushSync(){
+  if(!currentUser || !window.db) return;
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>{ try{ db.collection('atlas').doc(currentUser.uid).set(localBlob()); }catch(e){} }, 900);
+}
+
+/* load this user's data from Firestore into the app */
+async function loadUserData(uid){
+  if(!window.db) return;
+  try{
+    const snap=await db.collection('atlas').doc(uid).get();
+    if(snap.exists){ const d=snap.data()||{};
+      if(Array.isArray(d.chats)) saveChats(d.chats);
+      if(typeof d.memory==='string'){ try{ localStorage.setItem('atlas.memory', d.memory); }catch(e){} if(memText) memText.value=d.memory; }
+    }
+  }catch(e){}
+  renderRecents();
+}
+
+function setProfile(user){
+  const n=document.getElementById('acctName'), e=document.getElementById('acctEmail'), pf=document.getElementById('pfp');
+  if(n) n.textContent=user.displayName||'Signed in';
+  if(e) e.textContent=user.email||'';
+  if(pf) pf.textContent=(user.displayName||user.email||'?').trim().charAt(0).toUpperCase();
+}
+function showGate(show){ const g=document.getElementById('gate'); if(g) g.style.display=show?'flex':'none'; }
+
+if(window.firebase && window.ATLAS_FIREBASE_CONFIG && window.ATLAS_FIREBASE_CONFIG.apiKey!=='PASTE_API_KEY'){
+  firebase.initializeApp(window.ATLAS_FIREBASE_CONFIG);
+  window.auth=firebase.auth(); window.db=firebase.firestore();
+  document.getElementById('googleBtn').addEventListener('click', ()=>{
+    document.getElementById('gateErr').textContent='';
+    auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())
+      .catch(err=>{ document.getElementById('gateErr').textContent=err.message||'Sign-in failed.'; });
+  });
+  document.getElementById('signOut').addEventListener('click', ()=>{ auth.signOut(); });
+  auth.onAuthStateChanged(async (user)=>{
+    if(user){
+      currentUser=user; setProfile(user); showGate(false);
+      // start clean so nothing from another account lingers on a shared browser
+      history=[]; conv.innerHTML=''; currentId=null; chatting=false; app.classList.remove('chatting');
+      try{ localStorage.removeItem('atlas.chats'); localStorage.removeItem('atlas.memory'); }catch(e){}
+      if(memText) memText.value='';
+      await loadUserData(user.uid);
+      input.focus();
+    } else { currentUser=null; showGate(true); }
+  });
+} else {
+  showGate(true);
+  const s=document.getElementById('gateErr'); if(s) s.textContent='Add your Firebase config in index.html to enable sign-in.';
+}
 
 if('serviceWorker' in navigator){ addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{})); }
 
