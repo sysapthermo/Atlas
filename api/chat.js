@@ -26,7 +26,7 @@ export const config = { runtime: "edge" };
 const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || "atlas-5b1b0";
 const MODEL = "gemini-2.5-flash";       // free-tier, stable
 
-const DAILY_MSG_LIMIT   = 100;          // per user, per UTC day (a chat send = 1)
+const DAILY_MSG_LIMIT   = 110;          // per user, per UTC day (a chat send = 1)
 const IMAGE_COST        = 5;            // one generated image counts as this many
 const GLOBAL_DAILY_LIMIT = 1200;        // backstop across ALL users (protects the key)
 const KV_TTL_SECONDS    = 60 * 60 * 40; // 40h: comfortably outlives one UTC day
