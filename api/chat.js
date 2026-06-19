@@ -235,7 +235,9 @@ export default async function handler(req) {
         headers: { "Content-Type": "application/json", "x-goog-api-key": KEY },
         body: JSON.stringify({
           contents: [{ parts: [{ text: p }] }],
-          generationConfig: { responseModalities: ["image", "text"] },
+          // Modality enum values must be UPPERCASE. Lowercase ["image","text"]
+          // is rejected by the API, which was the cause of "Image error".
+          generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
         }),
       });
     } catch (e) { return json({ error: "Could not reach the image model", detail: String(e) }, 502, headers); }
