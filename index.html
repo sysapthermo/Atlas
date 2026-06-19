@@ -116,7 +116,17 @@
   .msg.atlas .body a{color:var(--glow);text-decoration:underline;text-underline-offset:2px}
   .msg.atlas .body code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13.5px;
     background:rgba(255,255,255,0.07);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
-  .msg.atlas .body pre{margin:0 0 12px;background:#0C0F14;border:1px solid var(--line-2);border-radius:12px;padding:14px 16px;overflow-x:auto}
+  .msg.atlas .body pre{margin:0 0 12px;background:#0C0F14;border:1px solid var(--line-2);border-radius:12px;padding:14px 16px;overflow-x:auto;position:relative}
+  .copybtn{position:absolute;top:8px;right:8px;font-family:var(--body);font-size:11px;color:var(--muted);
+    background:rgba(255,255,255,0.06);border:1px solid var(--line-2);border-radius:7px;padding:3px 9px;cursor:pointer;
+    opacity:.55;transition:opacity .15s,color .15s,background .15s}
+  .msg.atlas .body pre:hover .copybtn{opacity:1}
+  .copybtn:hover{color:var(--ink);background:rgba(255,255,255,0.12)}
+  .msg.atlas .body .sources{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+  .msg.atlas .body .sources .src-h{font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--faint);margin-bottom:7px}
+  .msg.atlas .body .sources .src{display:block;font-size:13px;color:var(--glow);text-decoration:none;padding:3px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .msg.atlas .body .sources .src:hover{text-decoration:underline}
+  .msg.atlas .body .genimg{max-width:100%;border-radius:12px;display:block}
   .msg.atlas .body pre code{background:none;border:none;padding:0;font-size:13px;line-height:1.6}
   .msg.atlas .body blockquote{margin:0 0 12px;padding:4px 0 4px 14px;border-left:2px solid var(--line-2);color:var(--muted)}
   .msg.atlas .body hr{border:none;border-top:1px solid var(--line);margin:16px 0}
@@ -322,6 +332,9 @@
         <button class="tool" id="searchBtn" aria-label="Toggle web search" title="Web search">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
         </button>
+        <button class="tool" id="imgBtn" aria-label="Toggle image generation" title="Generate an image">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+        </button>
         <button class="send" id="send" aria-label="Send message">
           <svg viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
         </button>
@@ -342,8 +355,8 @@ heroSlot.appendChild(document.getElementById('composerTpl').content.cloneNode(tr
 let input=document.getElementById('input'), sendBtn=document.getElementById('send');
 const attachBtn=document.getElementById('attachBtn'), searchBtn=document.getElementById('searchBtn'),
       fileInput=document.getElementById('fileInput'), micBtn=document.getElementById('micBtn'),
-      voiceBtn=document.getElementById('voiceBtn');
-let history=[], busy=false, chatting=false, pendingFile=null, searchOn=false, abortCtrl=null;
+      voiceBtn=document.getElementById('voiceBtn'), imgBtn=document.getElementById('imgBtn');
+let history=[], busy=false, chatting=false, pendingFile=null, searchOn=false, imgOn=false, abortCtrl=null;
 const SEND_ICON='<svg viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
 const STOP_ICON='<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none"/></svg>';
 function setBusy(b){ busy=b;
@@ -368,7 +381,7 @@ function persist(){
       : m);
     const rec={id:currentId,title,messages:safe,updated:Date.now()};
     const i=chats.findIndex(c=>c.id===currentId);
-    if(i>=0) chats[i]=rec; else chats.unshift(rec);
+    if(i>=0){ if(chats[i].titled){ rec.title=chats[i].title; rec.titled=true; } chats[i]=rec; } else chats.unshift(rec);
     chats.sort((a,b)=>b.updated-a.updated);
     saveChats(chats.slice(0,50));
     renderRecents();
@@ -433,10 +446,32 @@ function renderInto(body, t){
       body.innerHTML = DOMPurify.sanitize(marked.parse(t, {breaks:true}));
       if(window.hljs) body.querySelectorAll('pre code').forEach(b=>hljs.highlightElement(b));
       body.querySelectorAll('a').forEach(a=>{ a.target='_blank'; a.rel='noopener noreferrer'; });
+      addCopyButtons(body);
       return;
     }
   }catch(e){}
   body.textContent = t;   // safe fallback if a library didn't load
+}
+function addCopyButtons(body){
+  body.querySelectorAll('pre').forEach(pre=>{
+    if(pre.querySelector('.copybtn')) return;
+    const code=pre.querySelector('code'); if(!code) return;
+    const btn=document.createElement('button'); btn.className='copybtn'; btn.type='button'; btn.textContent='Copy';
+    btn.addEventListener('click', async ()=>{
+      try{ await navigator.clipboard.writeText(code.innerText); btn.textContent='Copied'; }
+      catch(e){ btn.textContent='Failed'; }
+      setTimeout(()=>btn.textContent='Copy', 1400);
+    });
+    pre.appendChild(btn);
+  });
+}
+function renderSources(body, sources){
+  const wrap=document.createElement('div'); wrap.className='sources';
+  const h=document.createElement('div'); h.className='src-h'; h.textContent='Sources'; wrap.appendChild(h);
+  sources.slice(0,6).forEach((s,i)=>{ const a=document.createElement('a'); a.className='src';
+    a.href=s.uri; a.target='_blank'; a.rel='noopener noreferrer';
+    a.textContent=(i+1)+'. '+(s.title||s.uri); wrap.appendChild(a); });
+  body.appendChild(wrap);
 }
 function addAtlas(t){ const e=document.createElement('div'); e.className='msg atlas';
   e.innerHTML='<div class="av">'+ORB+'</div><div class="body"></div>';
@@ -462,7 +497,7 @@ async function streamReply(history, onText, signal){
     throw new Error(m||'offline');
   }
   const reader=res.body.getReader(), dec=new TextDecoder();
-  let buf='', full='';
+  let buf='', full='', sources=[];
   while(true){
     const {value,done}=await reader.read(); if(done) break;
     buf+=dec.decode(value,{stream:true});
@@ -473,12 +508,19 @@ async function streamReply(history, onText, signal){
       const p=line.slice(5).trim();
       if(!p || p==='[DONE]') continue;
       try{ const o=JSON.parse(p);
-        const parts=o&&o.candidates&&o.candidates[0]&&o.candidates[0].content&&o.candidates[0].content.parts;
-        if(parts){ const t=parts.map(x=>x.text||'').join(''); if(t){ full+=t; onText(full); } }
+        const cand=o&&o.candidates&&o.candidates[0];
+        if(cand){
+          const parts=cand.content&&cand.content.parts;
+          if(parts){ const t=parts.map(x=>x.text||'').join(''); if(t){ full+=t; onText(full); } }
+          const gm=cand.groundingMetadata;
+          if(gm&&gm.groundingChunks){ for(const gc of gm.groundingChunks){
+            const w=gc.web||gc.retrievedContext; if(w&&w.uri) sources.push({uri:w.uri,title:w.title||w.uri}); } }
+        }
       }catch(e){}
     }
   }
-  return full;
+  const seen=new Set(); sources=sources.filter(s=> !seen.has(s.uri) && seen.add(s.uri));
+  return {text:full, sources};
 }
 
 async function send(){
@@ -486,26 +528,79 @@ async function send(){
   setBusy(true);
   if('speechSynthesis' in window) speechSynthesis.cancel();
   moveComposerToBottom();
+  if(imgOn){
+    if(!text){ setBusy(false); return; }
+    addUser(text); history.push({role:'user',content:text});
+    input.value=''; autosize();
+    await genImage(text);
+    setBusy(false); abortCtrl=null; pushSync(); input.focus(); return;
+  }
   const file=pendingFile;
   addUser(text, file);
   history.push(file ? {role:'user',content:text,file} : {role:'user',content:text});
   clearAttach(); input.value=''; autosize(); showThinking();
   abortCtrl=new AbortController();
-  let body=null, full='';
+  let body=null, full='', result=null;
   try{
-    await streamReply(history,(t)=>{ full=t;
+    result=await streamReply(history,(t)=>{ full=t;
       if(!body){ clearThinking(); body=addAtlasEmpty(); }
       body.textContent=t; scroll.scrollTop=scroll.scrollHeight; }, abortCtrl.signal);
+    full=result.text;
     if(!body){ clearThinking(); body=addAtlasEmpty(); }
     renderInto(body, full||"Came back empty on that one. Say it another way?");
+    if(result.sources && result.sources.length) renderSources(body, result.sources);
     scroll.scrollTop=scroll.scrollHeight;
     history.push({role:'assistant',content:full||''}); persist(); speak(full);
+    if(history.filter(m=>m.role==='user').length===1) genTitle();
   }catch(e){
     const stopped = e && (e.name==='AbortError' || /abort/i.test(String(e.message||'')));
     clearThinking();
     if(body){ renderInto(body, full); history.push({role:'assistant',content:full}); persist(); }
     else if(!stopped){ addAtlas("Lost the signal reaching my brain. Check the connection and try again.").style.color='var(--danger)'; }
   }finally{ setBusy(false); abortCtrl=null; pushSync(); input.focus(); }
+}
+
+/* generate an image from a prompt (free Nano Banana model via the proxy) */
+async function genImage(prompt){
+  showThinking();
+  try{
+    const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({mode:'image', prompt})});
+    const j=await res.json(); clearThinking();
+    if(j && j.image && j.image.data){
+      const e=document.createElement('div'); e.className='msg atlas';
+      e.innerHTML='<div class="av">'+ORB+'</div><div class="body"></div>';
+      const b=e.querySelector('.body');
+      const img=document.createElement('img'); img.className='genimg'; img.alt=prompt;
+      img.src='data:'+(j.image.mime_type||'image/png')+';base64,'+j.image.data; b.appendChild(img);
+      if(j.caption){ const c=document.createElement('div'); c.style.marginTop='8px'; c.textContent=j.caption; b.appendChild(c); }
+      conv.appendChild(e); scroll.scrollTop=scroll.scrollHeight;
+      history.push({role:'assistant',content:'[generated an image: '+prompt+']'}); persist();
+    } else {
+      addAtlas("Couldn't make that image. "+((j&&(j.error||j.detail))||'')).style.color='var(--danger)';
+    }
+  }catch(e){ clearThinking(); addAtlas("Image generation failed. Try again.").style.color='var(--danger)'; }
+}
+
+/* ask the model for a short title once a chat has its first exchange */
+async function genTitle(){
+  const firstU=history.find(m=>m.role==='user'); if(!firstU || !currentId) return;
+  try{
+    const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({messages:[{role:'user',content:'In 2 to 4 words, no quotes and no period, give a short title for a chat that begins:\n\n'+String(firstU.content||'').slice(0,300)}]})});
+    if(!res.ok || !res.body) return;
+    const reader=res.body.getReader(), dec=new TextDecoder(); let buf='', t='';
+    while(true){ const {value,done}=await reader.read(); if(done) break;
+      buf+=dec.decode(value,{stream:true}); let nl;
+      while((nl=buf.indexOf('\n'))>=0){ const line=buf.slice(0,nl).trim(); buf=buf.slice(nl+1);
+        if(!line.startsWith('data:')) continue; const p=line.slice(5).trim(); if(!p||p==='[DONE]') continue;
+        try{ const o=JSON.parse(p); const parts=o&&o.candidates&&o.candidates[0]&&o.candidates[0].content&&o.candidates[0].content.parts; if(parts) t+=parts.map(x=>x.text||'').join(''); }catch(e){}
+      }
+    }
+    t=t.replace(/["'`\n]/g,' ').replace(/[.\s]+$/,'').trim().slice(0,42);
+    if(t){ const chats=loadChats(); const i=chats.findIndex(c=>c.id===currentId);
+      if(i>=0){ chats[i].title=t; chats[i].titled=true; saveChats(chats); renderRecents(); pushSync(); } }
+  }catch(e){}
 }
 function autosize(){ input.style.height='auto'; const h=Math.min(input.scrollHeight,200);
   input.style.height=h+'px'; input.style.overflowY=input.scrollHeight>200?'auto':'hidden'; }
@@ -545,7 +640,11 @@ fileInput.addEventListener('change', async ()=>{
     renderAttachPreview(pendingFile); input.focus();
   }catch(e){ alert("Couldn't read that file. Try another one."); }
 });
-searchBtn.addEventListener('click', ()=>{ searchOn=!searchOn; searchBtn.classList.toggle('active', searchOn); });
+searchBtn.addEventListener('click', ()=>{ searchOn=!searchOn; searchBtn.classList.toggle('active', searchOn);
+  if(searchOn && imgOn){ imgOn=false; imgBtn.classList.remove('active'); } updatePlaceholder(); });
+imgBtn.addEventListener('click', ()=>{ imgOn=!imgOn; imgBtn.classList.toggle('active', imgOn);
+  if(imgOn && searchOn){ searchOn=false; searchBtn.classList.remove('active'); } updatePlaceholder(); });
+function updatePlaceholder(){ input.placeholder = imgOn ? 'Describe an image to generate' : 'Ask Atlas anything'; }
 
 /* ===== voice: talk to Atlas (speech-to-text) and hear it (text-to-speech) ===== */
 // 1) Speech-to-text via the browser's speech recognition.
