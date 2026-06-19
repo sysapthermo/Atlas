@@ -63,8 +63,11 @@
   .brand .orb{--d:22px}
   .brand .name{font-family:var(--display);font-weight:600;font-size:19px;letter-spacing:-0.2px}
   .brand .stat{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);
-    border:1px solid var(--line-2);border-radius:100px;padding:4px 10px;margin-left:4px}
+    border:1px solid var(--line-2);border-radius:100px;padding:4px 10px;margin-left:4px;cursor:pointer;
+    transition:border-color .15s,color .15s}
+  .brand .stat:hover{border-color:rgba(255,255,255,0.24);color:var(--ink)}
   .brand .stat .d{width:5px;height:5px;border-radius:50%;background:var(--glow);box-shadow:0 0 7px var(--glow)}
+  .brand .stat.low .d{background:var(--danger);box-shadow:0 0 7px var(--danger)}
   .controls{display:flex;align-items:center;gap:8px}
   .ico{width:38px;height:38px;border-radius:11px;border:1px solid var(--line-2);background:transparent;
     color:var(--muted);cursor:pointer;display:grid;place-items:center;transition:background .15s,color .15s,border-color .15s}
@@ -105,7 +108,7 @@
   .msg.atlas{display:flex;gap:15px}
   .msg.atlas .av{margin-top:3px}
   .msg.atlas .av .orb{--d:22px}
-  .msg.atlas .body{font-size:15.5px;line-height:1.78;color:var(--ink);word-wrap:break-word}
+  .msg.atlas .body{font-size:15.5px;line-height:1.78;color:var(--ink);word-wrap:break-word;min-width:0;flex:1}
   .msg.atlas .body>*:first-child{margin-top:0}
   .msg.atlas .body>*:last-child{margin-bottom:0}
   .msg.atlas .body p{margin:0 0 12px}
@@ -134,6 +137,14 @@
   .msg.atlas .body table{border-collapse:collapse;margin:0 0 12px;font-size:14px;display:block;overflow-x:auto}
   .msg.atlas .body th,.msg.atlas .body td{border:1px solid var(--line-2);padding:7px 11px;text-align:left}
   .msg.atlas .body th{background:rgba(255,255,255,0.04)}
+  /* per-answer action row (copy / regenerate) */
+  .turnacts{display:flex;gap:4px;margin-top:10px}
+  .actbtn{display:inline-flex;align-items:center;gap:6px;font-family:var(--body);font-size:12px;color:var(--faint);
+    background:transparent;border:1px solid transparent;border-radius:8px;padding:5px 9px;cursor:pointer;
+    transition:color .14s,background .14s,border-color .14s}
+  .actbtn:hover{color:var(--ink);background:rgba(255,255,255,0.05);border-color:var(--line-2)}
+  .actbtn:disabled{opacity:.4;cursor:not-allowed}
+  .actbtn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
   .msg.user{display:flex;justify-content:flex-end}
   .msg.user .bubble{background:var(--raised);border:1px solid var(--line);border-radius:18px 18px 5px 18px;
     padding:12px 18px;font-size:15.5px;line-height:1.6;max-width:78%;white-space:pre-wrap;word-wrap:break-word}
@@ -179,6 +190,8 @@
   .msg.user .bubble .filechip{font-size:13px;color:var(--muted);background:rgba(255,255,255,0.05);
     border:1px solid var(--line);border-radius:9px;padding:7px 11px;margin-bottom:8px;display:inline-block}
   .undertext{text-align:center;font-size:11.5px;color:var(--faint);margin-top:11px}
+  .limitnote{text-align:center;font-size:12px;color:var(--danger);margin-top:9px;min-height:0}
+  .limitnote:empty{display:none}
 
   /* ---- history slide-over (right) ---- */
   .scrim{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:39;opacity:0;pointer-events:none;transition:opacity .22s}
@@ -243,9 +256,37 @@
   .profile .n{font-size:13px;font-weight:500}
   .profile .p{font-size:11px;color:var(--faint)}
 
+  /* ---- settings modal ---- */
+  .modal-wrap{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;padding:22px}
+  .modal-wrap.show{display:flex}
+  .modal{width:100%;max-width:420px;background:var(--panel);border:1px solid var(--line-2);border-radius:18px;
+    box-shadow:var(--shadow);padding:20px 20px 8px;animation:rise .3s cubic-bezier(.2,.7,.2,1) both;max-height:86vh;overflow-y:auto}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+  .modal-head .t{font-family:var(--display);font-weight:600;font-size:18px}
+  .sect{padding:14px 0;border-top:1px solid var(--line)}
+  .sect:first-of-type{border-top:none}
+  .sect .lbl{font-size:11px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--faint);margin-bottom:10px}
+  .meter-top{display:flex;align-items:baseline;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:8px}
+  .meter-top b{font-family:var(--display);font-size:16px;color:var(--ink);font-weight:600}
+  .meter-bar{height:7px;border-radius:100px;background:var(--raised);border:1px solid var(--line);overflow:hidden}
+  .meter-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--glow),#c9d9ff);border-radius:100px;transition:width .4s ease}
+  .meter-fill.low{background:linear-gradient(90deg,var(--danger),#f0b39a)}
+  .meter-sub{font-size:11.5px;color:var(--faint);margin-top:8px}
+  .togrow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0}
+  .togrow .tx{font-size:13.5px;color:var(--ink)}
+  .togrow .tx .d2{font-size:11.5px;color:var(--faint);margin-top:2px}
+  .switch{position:relative;width:42px;height:24px;flex:0 0 auto;border:none;border-radius:100px;cursor:pointer;
+    background:var(--raised);border:1px solid var(--line-2);transition:background .16s,border-color .16s}
+  .switch::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;
+    background:var(--muted);transition:transform .16s,background .16s}
+  .switch.on{background:rgba(174,200,255,0.2);border-color:transparent}
+  .switch.on::after{transform:translateX(18px);background:var(--glow)}
+  .modal .syncbtn{margin-top:4px}
+  .modal-foot{font-size:11px;color:var(--faint);text-align:center;padding:14px 0 8px}
+
   @media (max-width:560px){ .hero h1{font-size:29px} .brand .stat{display:none} }
   @media (prefers-reduced-motion: reduce){
-    .orb,.orb.ring::after,.hero>*,.hero .orb,.msg,.tool.listening{animation:none !important}
+    .orb,.orb.ring::after,.hero>*,.hero .orb,.msg,.tool.listening,.modal{animation:none !important}
     .drawer,.scrim{transition:none !important}
   }
 </style>
@@ -292,7 +333,7 @@
       <div class="brand">
         <span class="orb ring"></span>
         <span class="name">Atlas</span>
-        <span class="stat"><span class="d"></span>Gemini</span>
+        <span class="stat" id="quotaPill" title="Daily usage"><span class="d"></span><span id="quotaText">Gemini</span></span>
       </div>
       <div class="controls">
         <button class="ico" id="voiceBtn" aria-label="Read replies aloud" title="Read replies aloud">
@@ -300,6 +341,9 @@
         </button>
         <button class="ico" id="newBtn" aria-label="New chat" title="New chat">
           <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <button class="ico" id="settingsBtn" aria-label="Settings" title="Settings">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
         <button class="ico" id="histBtn" aria-label="History" title="History">
           <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 9 8 9"/><polyline points="12 8 12 12 15 14"/></svg>
@@ -357,6 +401,45 @@
     </div>
   </aside>
 
+  <!-- settings modal -->
+  <div class="modal-wrap" id="settingsWrap">
+    <div class="modal" id="settingsModal" role="dialog" aria-label="Settings">
+      <div class="modal-head">
+        <span class="t">Settings</span>
+        <button class="ico" id="settingsClose" aria-label="Close" style="width:32px;height:32px;border-radius:9px">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="sect">
+        <div class="lbl">Usage today</div>
+        <div class="meter-top"><span id="meterCount"><b>—</b> of — messages</span><span id="meterReset"></span></div>
+        <div class="meter-bar"><div class="meter-fill" id="meterFill"></div></div>
+        <div class="meter-sub" id="meterSub">Each message counts as one. A generated image counts as a few. Resets at midnight UTC.</div>
+      </div>
+
+      <div class="sect">
+        <div class="lbl">Preferences</div>
+        <div class="togrow">
+          <div class="tx">Read replies aloud<div class="d2">Speak Atlas's answers using your device voice</div></div>
+          <button class="switch" id="swVoice" role="switch" aria-label="Read replies aloud"></button>
+        </div>
+        <div class="togrow">
+          <div class="tx">Start chats with web search on<div class="d2">New chats begin with grounding enabled</div></div>
+          <button class="switch" id="swSearch" role="switch" aria-label="Start chats with web search on"></button>
+        </div>
+      </div>
+
+      <div class="sect">
+        <div class="lbl">Data</div>
+        <div class="meter-sub" style="margin:0 0 10px">Your chats and memory are private to your account and synced across your devices.</div>
+        <button class="syncbtn" id="refreshCloud">Refresh from cloud</button>
+      </div>
+
+      <div class="modal-foot">Atlas · powered by Gemini</div>
+    </div>
+  </div>
+
   <template id="composerTpl">
     <div class="composer" id="composer">
       <div id="attachRow" class="attach-row"></div>
@@ -379,7 +462,8 @@
         </button>
       </div>
       <input type="file" id="fileInput" accept="image/*,application/pdf" hidden />
-      <div class="undertext">Atlas can make mistakes. Check important info. Session memory only.</div>
+      <div class="limitnote" id="limitNote"></div>
+      <div class="undertext">Atlas can make mistakes. Check important info.</div>
     </div>
   </template>
 
@@ -394,37 +478,115 @@ heroSlot.appendChild(document.getElementById('composerTpl').content.cloneNode(tr
 let input=document.getElementById('input'), sendBtn=document.getElementById('send');
 const attachBtn=document.getElementById('attachBtn'), searchBtn=document.getElementById('searchBtn'),
       fileInput=document.getElementById('fileInput'), micBtn=document.getElementById('micBtn'),
-      voiceBtn=document.getElementById('voiceBtn'), imgBtn=document.getElementById('imgBtn');
+      voiceBtn=document.getElementById('voiceBtn'), imgBtn=document.getElementById('imgBtn'),
+      limitNote=document.getElementById('limitNote');
 let history=[], busy=false, chatting=false, pendingFile=null, searchOn=false, imgOn=false, abortCtrl=null;
+let searchDefault=false;            // settings: start new chats with search on
+let limitUntil=0;                   // epoch ms; while in the future, sending is blocked
 const SEND_ICON='<svg viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
 const STOP_ICON='<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none"/></svg>';
 function setBusy(b){ busy=b;
   if(b){ sendBtn.classList.add('is-stop'); sendBtn.innerHTML=STOP_ICON; sendBtn.setAttribute('aria-label','Stop'); }
   else { sendBtn.classList.remove('is-stop'); sendBtn.innerHTML=SEND_ICON; sendBtn.setAttribute('aria-label','Send message'); } }
 
-/* ===== memory: save chats to the browser so they survive a refresh ===== */
+/* ===== auth header: every /api/chat call must carry a verified token ===== */
+async function authHeaders(){
+  const h={'Content-Type':'application/json'};
+  if(currentUser){ try{ h['Authorization']='Bearer '+(await currentUser.getIdToken()); }catch(e){} }
+  return h;
+}
+/* POST to /api/chat with auth; on a 401 (stale token) force-refresh once and retry. */
+async function apiPost(payload, signal){
+  let headers=await authHeaders();
+  let res=await fetch('/api/chat',{method:'POST',headers,body:JSON.stringify(payload),signal});
+  if(res.status===401 && currentUser){
+    try{ await currentUser.getIdToken(true); }catch(e){}
+    headers=await authHeaders();
+    res=await fetch('/api/chat',{method:'POST',headers,body:JSON.stringify(payload),signal});
+  }
+  return res;
+}
+
+/* ===== usage meter (driven by the server's X-RateLimit-* headers) ===== */
+let quota={limit:null, remaining:null, reset:null};
+function readQuota(res){
+  try{
+    const lim=res.headers.get('X-RateLimit-Limit');
+    const rem=res.headers.get('X-RateLimit-Remaining');
+    const rst=res.headers.get('X-RateLimit-Reset');
+    if(lim!=null) quota.limit=parseInt(lim,10);
+    if(rem!=null) quota.remaining=parseInt(rem,10);
+    if(rst!=null) quota.reset=parseInt(rst,10);
+    renderQuota();
+  }catch(e){}
+}
+function fmtReset(){
+  if(!quota.reset) return '';
+  const ms=quota.reset*1000-Date.now(); if(ms<=0) return 'resets soon';
+  const h=Math.floor(ms/3600000), m=Math.floor((ms%3600000)/60000);
+  return 'resets in '+(h>0?h+'h '+m+'m':m+'m');
+}
+function renderQuota(){
+  const pill=document.getElementById('quotaPill'), txt=document.getElementById('quotaText');
+  if(quota.limit!=null && quota.remaining!=null){
+    const low=quota.remaining<=Math.max(5,Math.floor(quota.limit*0.1));
+    if(txt) txt.textContent=quota.remaining+' left';
+    if(pill) pill.classList.toggle('low', low);
+  } else { if(txt) txt.textContent='Gemini'; }
+  // settings meter
+  const used=(quota.limit!=null&&quota.remaining!=null)?Math.max(0,quota.limit-quota.remaining):null;
+  const mc=document.getElementById('meterCount'), mf=document.getElementById('meterFill'),
+        mr=document.getElementById('meterReset');
+  if(mc) mc.innerHTML = used!=null ? ('<b>'+used+'</b> of '+quota.limit+' messages') : '<b>—</b> of — messages';
+  if(mf && used!=null){ const pct=Math.min(100,Math.round(used/quota.limit*100));
+    mf.style.width=pct+'%'; mf.classList.toggle('low', quota.remaining<=Math.max(5,Math.floor(quota.limit*0.1))); }
+  if(mr) mr.textContent=fmtReset();
+}
+/* called when the server says 429 */
+function onLimited(data){
+  if(data && data.reset){ quota.reset=data.reset; limitUntil=data.reset*1000; }
+  if(data && data.limit!=null){ quota.limit=data.limit; }
+  quota.remaining=0; renderQuota();
+  if(limitNote) limitNote.textContent=(data&&data.error)||"Daily limit reached. "+fmtReset()+".";
+  updateSendEnabled();
+}
+function limitActive(){ return Date.now()<limitUntil; }
+function updateSendEnabled(){
+  if(limitActive()){ sendBtn.disabled=true; }
+  else { sendBtn.disabled=false; if(limitNote && !busy) limitNote.textContent=''; }
+}
+
+/* ===== local cache (mirrors Firestore; survives refresh / offline) ===== */
 let currentId=null;
 const LS='atlas.chats';
 function loadChats(){ try{ return JSON.parse(localStorage.getItem(LS))||[]; }catch(e){ return []; } }
 function saveChats(a){ try{ localStorage.setItem(LS, JSON.stringify(a)); }catch(e){} }
+
+/* Build the record for the current chat from in-memory history. */
+function buildRecord(){
+  if(!history.length) return null;
+  const first=history.find(m=>m.role==='user');
+  const title=((first&&first.content)||(first&&first.file&&(first.file.name||'Attachment'))||'New chat').slice(0,42);
+  if(!currentId) currentId=Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  // strip heavy file bytes before saving so we don't blow storage limits
+  const safe=history.map(m=> m.file
+    ? {role:m.role,content:m.content,file:{name:m.file.name,mime_type:m.file.mime_type}}
+    : m);
+  const rec={id:currentId,title,messages:safe,updated:Date.now()};
+  const existing=loadChats().find(c=>c.id===currentId);
+  if(existing && existing.titled){ rec.title=existing.title; rec.titled=true; }
+  return rec;
+}
+/* Persist the CURRENT chat: update local cache + push just this chat doc to Firestore. */
 function persist(){
-  if(!history.length) return;
-  try{
-    const chats=loadChats();
-    const first=history.find(m=>m.role==='user');
-    const title=((first&&first.content)||(first&&first.file&&(first.file.name||'Attachment'))||'New chat').slice(0,42);
-    if(!currentId) currentId=Date.now().toString(36);
-    // strip heavy file bytes before saving so we don't blow the browser's storage limit
-    const safe=history.map(m=> m.file
-      ? {role:m.role,content:m.content,file:{name:m.file.name,mime_type:m.file.mime_type}}
-      : m);
-    const rec={id:currentId,title,messages:safe,updated:Date.now()};
-    const i=chats.findIndex(c=>c.id===currentId);
-    if(i>=0){ if(chats[i].titled){ rec.title=chats[i].title; rec.titled=true; } chats[i]=rec; } else chats.unshift(rec);
-    chats.sort((a,b)=>b.updated-a.updated);
-    saveChats(chats.slice(0,50));
-    renderRecents();
-  }catch(e){}
+  const rec=buildRecord(); if(!rec) return;
+  const chats=loadChats();
+  const i=chats.findIndex(c=>c.id===currentId);
+  if(i>=0) chats[i]=rec; else chats.unshift(rec);
+  chats.sort((a,b)=>b.updated-a.updated);
+  saveChats(chats);
+  renderRecents();
+  pushChat(rec);
 }
 function renderRecents(){
   const list=document.getElementById('recentList'); if(!list) return;
@@ -444,6 +606,7 @@ function renderRecents(){
 function rebuildConv(){
   conv.innerHTML='';
   history.forEach(m=>{ if(m.role==='user') addUser(m.content, m.file); else addAtlas(m.content); });
+  decorateLastAtlas();
   scroll.scrollTop=scroll.scrollHeight;
 }
 function openChat(id){
@@ -455,8 +618,8 @@ function openChat(id){
 }
 function deleteChat(id){
   saveChats(loadChats().filter(c=>c.id!==id));
+  removeChatDoc(id);
   if(id===currentId) newChat(); else renderRecents();
-  pushSync();
 }
 
 (function(){ const h=new Date().getHours();
@@ -525,12 +688,41 @@ function addAtlasEmpty(){ const e=document.createElement('div'); e.className='ms
   e.innerHTML='<div class="av">'+ORB+'</div><div class="body"></div>';
   conv.appendChild(e); scroll.scrollTop=scroll.scrollHeight; return e.querySelector('.body'); }
 
-/* ===== brain — calls your proxy at /api/chat ===== */
+/* ===== per-answer actions: Copy + Regenerate on the LAST Atlas reply ===== */
+const COPY_SVG='<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+const REGEN_SVG='<svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>';
+function decorateLastAtlas(){
+  conv.querySelectorAll('.turnacts').forEach(n=>n.remove());
+  const atlasMsgs=conv.querySelectorAll('.msg.atlas');
+  if(!atlasMsgs.length) return;
+  const last=atlasMsgs[atlasMsgs.length-1];
+  const body=last.querySelector('.body'); if(!body) return;
+  const isImage=!!body.querySelector('.genimg');
+  const plain=body.innerText;            // capture before the bar is added
+  const bar=document.createElement('div'); bar.className='turnacts';
+  if(!isImage){                          // copying an image as text is meaningless
+    const copy=document.createElement('button'); copy.className='actbtn'; copy.type='button';
+    copy.innerHTML=COPY_SVG+'<span>Copy</span>';
+    copy.addEventListener('click', async ()=>{
+      try{ await navigator.clipboard.writeText(plain); copy.querySelector('span').textContent='Copied'; }
+      catch(e){ copy.querySelector('span').textContent='Failed'; }
+      setTimeout(()=>{ const s=copy.querySelector('span'); if(s) s.textContent='Copy'; },1400);
+    });
+    bar.appendChild(copy);
+  }
+  const regen=document.createElement('button'); regen.className='actbtn'; regen.type='button';
+  regen.innerHTML=REGEN_SVG+'<span>Regenerate</span>';
+  regen.addEventListener('click', regenerate);
+  bar.appendChild(regen);
+  body.appendChild(bar);
+}
+
 /* ===== brain — streams the reply from /api/chat as it's generated ===== */
 async function streamReply(history, onText, signal){
   let memory=''; try{ memory=localStorage.getItem('atlas.memory')||''; }catch(e){}
-  const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({messages:history, memory, search:searchOn}), signal});
+  const res=await apiPost({messages:history, memory, search:searchOn}, signal);
+  readQuota(res);
+  if(res.status===429){ let d={}; try{ d=await res.json(); }catch(e){} onLimited(d); const err=new Error(d.error||'limit'); err.code='limit'; throw err; }
   if(!res.ok || !res.body){
     let m=''; try{ const d=await res.json(); m=d.error||d.detail||''; }catch(e){}
     throw new Error(m||'offline');
@@ -562,22 +754,9 @@ async function streamReply(history, onText, signal){
   return {text:full, sources};
 }
 
-async function send(){
-  const text=input.value.trim(); if((!text && !pendingFile)||busy) return;
-  setBusy(true);
-  if('speechSynthesis' in window) speechSynthesis.cancel();
-  moveComposerToBottom();
-  if(imgOn){
-    if(!text){ setBusy(false); return; }
-    addUser(text); history.push({role:'user',content:text});
-    input.value=''; autosize();
-    await genImage(text);
-    setBusy(false); abortCtrl=null; pushSync(); input.focus(); return;
-  }
-  const file=pendingFile;
-  addUser(text, file);
-  history.push(file ? {role:'user',content:text,file} : {role:'user',content:text});
-  clearAttach(); input.value=''; autosize(); showThinking();
+/* Shared "run one assistant turn" used by both send() and regenerate(). */
+async function runAssistantTurn(){
+  showThinking();
   abortCtrl=new AbortController();
   let body=null, full='', result=null;
   try{
@@ -588,23 +767,71 @@ async function send(){
     if(!body){ clearThinking(); body=addAtlasEmpty(); }
     renderInto(body, full||"Came back empty on that one. Say it another way?");
     if(result.sources && result.sources.length) renderSources(body, result.sources);
+    decorateLastAtlas();
     scroll.scrollTop=scroll.scrollHeight;
     history.push({role:'assistant',content:full||''}); persist(); speak(full);
     if(history.filter(m=>m.role==='user').length===1) genTitle();
   }catch(e){
     const stopped = e && (e.name==='AbortError' || /abort/i.test(String(e.message||'')));
     clearThinking();
-    if(body){ renderInto(body, full); history.push({role:'assistant',content:full}); persist(); }
+    if(e && e.code==='limit'){ /* message already shown by onLimited */ }
+    else if(body){ renderInto(body, full); decorateLastAtlas(); history.push({role:'assistant',content:full}); persist(); }
     else if(!stopped){ addAtlas("Lost the signal reaching my brain. Check the connection and try again.").style.color='var(--danger)'; }
-  }finally{ setBusy(false); abortCtrl=null; pushSync(); input.focus(); }
+  }finally{ setBusy(false); abortCtrl=null; updateSendEnabled(); input.focus(); }
+}
+
+async function send(){
+  const text=input.value.trim(); if((!text && !pendingFile)||busy) return;
+  if(limitActive()){ if(limitNote) limitNote.textContent="Daily limit reached. "+fmtReset()+"."; return; }
+  setBusy(true);
+  if('speechSynthesis' in window) speechSynthesis.cancel();
+  moveComposerToBottom();
+  if(imgOn){
+    if(!text){ setBusy(false); return; }
+    addUser(text); history.push({role:'user',content:text});
+    input.value=''; autosize();
+    await genImage(text);
+    setBusy(false); abortCtrl=null; updateSendEnabled(); input.focus(); return;
+  }
+  const file=pendingFile;
+  addUser(text, file);
+  history.push(file ? {role:'user',content:text,file} : {role:'user',content:text});
+  clearAttach(); input.value=''; autosize();
+  await runAssistantTurn();
+}
+
+/* Regenerate the last answer: drop trailing assistant turn(s), re-run from the last user message. */
+async function regenerate(){
+  if(busy || limitActive()) return;
+  // remember whether the answer we're replacing was an image, then drop trailing assistant turn(s)
+  let removed=false, wasImage=false;
+  while(history.length && history[history.length-1].role==='assistant'){
+    if(/^\[generated an image: /.test(String(history[history.length-1].content||''))) wasImage=true;
+    history.pop(); removed=true;
+  }
+  if(!removed) return;
+  const lastUser=[...history].reverse().find(m=>m.role==='user');
+  if(!lastUser) return;
+  // drop the last Atlas bubble from the DOM
+  const atlasMsgs=conv.querySelectorAll('.msg.atlas');
+  if(atlasMsgs.length) atlasMsgs[atlasMsgs.length-1].remove();
+  setBusy(true);
+  if('speechSynthesis' in window) speechSynthesis.cancel();
+  if(wasImage){                       // image turn: re-generate an image from the same prompt
+    await genImage(String(lastUser.content||''));
+    setBusy(false); abortCtrl=null; updateSendEnabled(); input.focus();
+  } else {
+    await runAssistantTurn();
+  }
 }
 
 /* generate an image from a prompt (free Nano Banana model via the proxy) */
 async function genImage(prompt){
   showThinking();
   try{
-    const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({mode:'image', prompt})});
+    const res=await apiPost({mode:'image', prompt});
+    readQuota(res);
+    if(res.status===429){ let d={}; try{ d=await res.json(); }catch(e){} clearThinking(); onLimited(d); return; }
     const j=await res.json(); clearThinking();
     if(j && j.image && j.image.data){
       const e=document.createElement('div'); e.className='msg atlas';
@@ -615,6 +842,7 @@ async function genImage(prompt){
       if(j.caption){ const c=document.createElement('div'); c.style.marginTop='8px'; c.textContent=j.caption; b.appendChild(c); }
       conv.appendChild(e); scroll.scrollTop=scroll.scrollHeight;
       history.push({role:'assistant',content:'[generated an image: '+prompt+']'}); persist();
+      decorateLastAtlas();
     } else {
       addAtlas("Couldn't make that image. "+((j&&(j.error||j.detail))||'')).style.color='var(--danger)';
     }
@@ -625,8 +853,8 @@ async function genImage(prompt){
 async function genTitle(){
   const firstU=history.find(m=>m.role==='user'); if(!firstU || !currentId) return;
   try{
-    const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({messages:[{role:'user',content:'In 2 to 4 words, no quotes and no period, give a short title for a chat that begins:\n\n'+String(firstU.content||'').slice(0,300)}]})});
+    const res=await apiPost({messages:[{role:'user',content:'In 2 to 4 words, no quotes and no period, give a short title for a chat that begins:\n\n'+String(firstU.content||'').slice(0,300)}]});
+    readQuota(res);
     if(!res.ok || !res.body) return;
     const reader=res.body.getReader(), dec=new TextDecoder(); let buf='', t='';
     while(true){ const {value,done}=await reader.read(); if(done) break;
@@ -638,7 +866,7 @@ async function genTitle(){
     }
     t=t.replace(/["'`\n]/g,' ').replace(/[.\s]+$/,'').trim().slice(0,42);
     if(t){ const chats=loadChats(); const i=chats.findIndex(c=>c.id===currentId);
-      if(i>=0){ chats[i].title=t; chats[i].titled=true; saveChats(chats); renderRecents(); pushSync(); } }
+      if(i>=0){ chats[i].title=t; chats[i].titled=true; saveChats(chats); renderRecents(); pushChat(chats[i]); } }
   }catch(e){}
 }
 function autosize(){ input.style.height='auto'; const h=Math.min(input.scrollHeight,200);
@@ -654,6 +882,8 @@ document.querySelectorAll('.chip').forEach(c=>{
 
 function newChat(){ currentId=null; history=[]; conv.innerHTML=''; chatting=false; app.classList.remove('chatting');
   heroSlot.appendChild(document.getElementById('composer')); input.value=''; autosize();
+  searchOn=searchDefault; searchBtn.classList.toggle('active', searchOn);
+  imgOn=false; imgBtn.classList.remove('active'); updatePlaceholder();
   renderRecents(); closeDrawer(); input.focus(); }
 function readFile(file){ return new Promise((res,rej)=>{ const r=new FileReader();
   r.onload=()=>res(r.result.split(',')[1]); r.onerror=rej; r.readAsDataURL(file); }); }
@@ -704,13 +934,13 @@ if(SR){
 // 2) Text-to-speech: read Atlas's replies aloud when toggled on.
 let speakOn=false; try{ speakOn=localStorage.getItem('atlas.voice')==='1'; }catch(e){}
 const canSpeak = 'speechSynthesis' in window;
+function setVoiceState(on){ speakOn=on; voiceBtn.classList.toggle('active', speakOn);
+  try{ localStorage.setItem('atlas.voice', speakOn?'1':'0'); }catch(e){}
+  syncSwitch('swVoice', speakOn);
+  if(!speakOn && canSpeak) speechSynthesis.cancel(); }
 if(canSpeak){ voiceBtn.classList.toggle('active', speakOn); }
 else { voiceBtn.style.display='none'; }
-voiceBtn.addEventListener('click', ()=>{
-  speakOn=!speakOn; voiceBtn.classList.toggle('active', speakOn);
-  try{ localStorage.setItem('atlas.voice', speakOn?'1':'0'); }catch(e){}
-  if(!speakOn && canSpeak) speechSynthesis.cancel();
-});
+voiceBtn.addEventListener('click', ()=>{ if(!canSpeak) return; setVoiceState(!speakOn); });
 function cleanForSpeech(t){
   return String(t).replace(/```[\s\S]*?```/g,' (code) ').replace(/`([^`]+)`/g,'$1')
     .replace(/!\[[^\]]*\]\([^)]*\)/g,'').replace(/\[([^\]]+)\]\([^)]*\)/g,'$1')
@@ -739,33 +969,87 @@ function closeDrawer(){ drawer.classList.remove('open'); scrim.classList.remove(
 document.getElementById('histBtn').addEventListener('click', openDrawer);
 document.getElementById('closeBtn').addEventListener('click', closeDrawer);
 scrim.addEventListener('click', closeDrawer);
-addEventListener('keydown', e=>{ if(e.key==='Escape') closeDrawer(); });
+addEventListener('keydown', e=>{ if(e.key==='Escape'){ closeDrawer(); closeSettings(); }});
+
+/* ===== settings modal ===== */
+const settingsWrap=document.getElementById('settingsWrap');
+function openSettings(){ renderQuota(); settingsWrap.classList.add('show'); }
+function closeSettings(){ settingsWrap.classList.remove('show'); }
+document.getElementById('settingsBtn').addEventListener('click', openSettings);
+document.getElementById('settingsClose').addEventListener('click', closeSettings);
+document.getElementById('quotaPill').addEventListener('click', openSettings);
+settingsWrap.addEventListener('click', e=>{ if(e.target===settingsWrap) closeSettings(); });
+function syncSwitch(id,on){ const s=document.getElementById(id); if(s) s.classList.toggle('on', !!on); }
+document.getElementById('swVoice').addEventListener('click', ()=>{ if(!canSpeak) return; setVoiceState(!speakOn); });
+try{ searchDefault=localStorage.getItem('atlas.searchDefault')==='1'; }catch(e){}
+syncSwitch('swSearch', searchDefault);
+document.getElementById('swSearch').addEventListener('click', ()=>{
+  searchDefault=!searchDefault; try{ localStorage.setItem('atlas.searchDefault', searchDefault?'1':'0'); }catch(e){}
+  syncSwitch('swSearch', searchDefault);
+});
+document.getElementById('refreshCloud').addEventListener('click', async (e)=>{
+  if(!currentUser) return; const b=e.currentTarget; b.textContent='Refreshing...';
+  await loadUserData(currentUser.uid); b.textContent='Refreshed';
+  if(!currentId) renderRecents(); setTimeout(()=>b.textContent='Refresh from cloud',1400);
+});
 
 const memText=document.getElementById('memText');
 try{ memText.value=localStorage.getItem('atlas.memory')||''; }catch(e){}
-memText.addEventListener('input',()=>{ try{ localStorage.setItem('atlas.memory', memText.value); }catch(e){} pushSync(); });
+memText.addEventListener('input',()=>{ try{ localStorage.setItem('atlas.memory', memText.value); }catch(e){} pushMemory(); });
 
-/* ===== accounts: Google sign-in (Firebase Auth) + private per-user data (Firestore) ===== */
-let currentUser=null, saveTimer=null;
-function localBlob(){ let mem=''; try{ mem=localStorage.getItem('atlas.memory')||''; }catch(e){}
-  return { chats:loadChats(), memory:mem, updatedAt:Date.now() }; }
+/* ===== accounts: Google sign-in (Firebase Auth) + private per-user data (Firestore) =====
+   Data model (per user):
+     atlas/{uid}                     -> { memory, updatedAt }     (profile-level)
+     atlas/{uid}/chats/{chatId}      -> { id, title, messages[], updated, titled }
+   One doc PER CHAT escapes the old 1 MiB single-document limit. */
+let currentUser=null, memTimer=null;
+const chatTimers={};
 
-/* write THIS user's data to their own private Firestore document (debounced) */
-function pushSync(){
+function chatsCol(){ return db.collection('atlas').doc(currentUser.uid).collection('chats'); }
+
+/* write ONE chat document (debounced per chat id) */
+function pushChat(rec){
+  if(!currentUser || !window.db || !rec) return;
+  clearTimeout(chatTimers[rec.id]);
+  chatTimers[rec.id]=setTimeout(()=>{ try{ chatsCol().doc(rec.id).set(rec); }catch(e){} }, 800);
+}
+function removeChatDoc(id){
   if(!currentUser || !window.db) return;
-  clearTimeout(saveTimer);
-  saveTimer=setTimeout(()=>{ try{ db.collection('atlas').doc(currentUser.uid).set(localBlob()); }catch(e){} }, 900);
+  clearTimeout(chatTimers[id]);
+  try{ chatsCol().doc(id).delete(); }catch(e){}
+}
+/* write the profile-level memory note (debounced) */
+function pushMemory(){
+  if(!currentUser || !window.db) return;
+  clearTimeout(memTimer);
+  memTimer=setTimeout(()=>{ try{
+    let mem=''; try{ mem=localStorage.getItem('atlas.memory')||''; }catch(e){}
+    db.collection('atlas').doc(currentUser.uid).set({memory:mem, updatedAt:Date.now()}, {merge:true});
+  }catch(e){} }, 900);
 }
 
-/* load this user's data from Firestore into the app */
+/* load this user's data: migrate any legacy chats array, then read the subcollection */
 async function loadUserData(uid){
   if(!window.db) return;
   try{
-    const snap=await db.collection('atlas').doc(uid).get();
-    if(snap.exists){ const d=snap.data()||{};
-      if(Array.isArray(d.chats)) saveChats(d.chats);
-      if(typeof d.memory==='string'){ try{ localStorage.setItem('atlas.memory', d.memory); }catch(e){} if(memText) memText.value=d.memory; }
+    const ref=db.collection('atlas').doc(uid);
+    const snap=await ref.get();
+    const d=snap.exists ? (snap.data()||{}) : {};
+
+    if(typeof d.memory==='string'){ try{ localStorage.setItem('atlas.memory', d.memory); }catch(e){} if(memText) memText.value=d.memory; }
+
+    // ONE-TIME MIGRATION: legacy { chats:[...] } array -> per-chat subcollection docs
+    if(Array.isArray(d.chats) && d.chats.length){
+      for(const c of d.chats){
+        if(c && c.id){ try{ await ref.collection('chats').doc(c.id).set(c); }catch(e){} }
+      }
+      try{ await ref.set({chats: firebase.firestore.FieldValue.delete()}, {merge:true}); }catch(e){}
     }
+
+    // read the subcollection (newest first)
+    const cs=await ref.collection('chats').orderBy('updated','desc').limit(100).get();
+    const chats=[]; cs.forEach(doc=>{ const c=doc.data(); if(c && c.id) chats.push(c); });
+    saveChats(chats);
   }catch(e){}
   renderRecents();
 }
@@ -794,6 +1078,8 @@ if(window.firebase && window.ATLAS_FIREBASE_CONFIG && window.ATLAS_FIREBASE_CONF
       history=[]; conv.innerHTML=''; currentId=null; chatting=false; app.classList.remove('chatting');
       try{ localStorage.removeItem('atlas.chats'); localStorage.removeItem('atlas.memory'); }catch(e){}
       if(memText) memText.value='';
+      quota={limit:null,remaining:null,reset:null}; limitUntil=0; renderQuota(); updateSendEnabled();
+      searchOn=searchDefault; searchBtn.classList.toggle('active', searchOn); updatePlaceholder();
       await loadUserData(user.uid);
       input.focus();
     } else { currentUser=null; showGate(true); }
@@ -806,6 +1092,7 @@ if(window.firebase && window.ATLAS_FIREBASE_CONFIG && window.ATLAS_FIREBASE_CONF
 if('serviceWorker' in navigator){ addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{})); }
 
 renderRecents();
+renderQuota();
 input.focus();
 </script>
 </body>
