@@ -34,7 +34,37 @@ export default async function handler(req) {
   let body;
   try { body = await req.json(); } catch (e) { return json({ error: "Bad JSON" }, 400); }
 
-  const { messages, memory, search } = body || {};
+  const { messages, memory, search, mode, prompt } = body || {};
+
+  // ----- image generation (gemini-2.5-flash-image / "Nano Banana", free tier) -----
+  if (mode === "image") {
+    const p = (prompt || "").trim();
+    if (!p) return json({ error: "No image prompt provided." }, 400);
+    const iurl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent";
+    let ir;
+    try {
+      ir = await fetch(iurl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": KEY },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: p }] }],
+          generationConfig: { responseModalities: ["image", "text"] },
+        }),
+      });
+    } catch (e) { return json({ error: "Could not reach the image model", detail: String(e) }, 502); }
+    if (!ir.ok) { const d = await ir.text().catch(() => ""); return json({ error: "Image error", detail: d }, 502); }
+    const idata = await ir.json();
+    const iparts = (idata.candidates && idata.candidates[0] && idata.candidates[0].content && idata.candidates[0].content.parts) || [];
+    let image = null, caption = "";
+    for (const pt of iparts) {
+      const inl = pt.inlineData || pt.inline_data;
+      if (inl && inl.data) image = { mime_type: inl.mimeType || inl.mime_type || "image/png", data: inl.data };
+      else if (pt.text) caption += pt.text;
+    }
+    if (!image) return json({ error: "No image came back", detail: caption }, 502);
+    return json({ image, caption: caption.trim() });
+  }
+
   if (!Array.isArray(messages)) return json({ error: "messages must be an array" }, 400);
 
   // The model has no clock, so we tell it the real Eastern time each request.
