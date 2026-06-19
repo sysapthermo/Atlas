@@ -844,7 +844,9 @@ async function genImage(prompt){
       history.push({role:'assistant',content:'[generated an image: '+prompt+']'}); persist();
       decorateLastAtlas();
     } else {
-      addAtlas("Couldn't make that image. "+((j&&(j.error||j.detail))||'')).style.color='var(--danger)';
+      const why=(j&&j.error)||'Something went wrong.';
+      const det=(j&&j.detail&&j.detail!==j.error)?(' ('+j.detail+')'):'';
+      addAtlas("Couldn't make that image. "+why+det).style.color='var(--danger)';
     }
   }catch(e){ clearThinking(); addAtlas("Image generation failed. Try again.").style.color='var(--danger)'; }
 }
