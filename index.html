@@ -178,6 +178,9 @@
   .tool.listening{background:rgba(255,130,120,0.18);color:#ff9a8c;animation:micpulse 1.3s ease-in-out infinite}
   @keyframes micpulse{0%,100%{box-shadow:0 0 0 0 rgba(255,130,120,0.4)}50%{box-shadow:0 0 0 7px rgba(255,130,120,0)}}
   .ico.active{background:rgba(174,200,255,0.16);color:var(--glow);border-color:transparent}
+  /* Image generation needs billing on the Gemini key, so the button is hidden.
+     To bring it back later, just delete this one rule. */
+  #imgBtn{display:none}
   .attach-row{display:flex;flex-wrap:wrap;gap:8px;padding:0 4px 8px}
   .attach-row:empty{display:none}
   .apreview{display:flex;align-items:center;gap:8px;background:var(--raised);border:1px solid var(--line-2);
