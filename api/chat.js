@@ -241,7 +241,20 @@ export default async function handler(req) {
         }),
       });
     } catch (e) { return json({ error: "Could not reach the image model", detail: String(e) }, 502, headers); }
-    if (!ir.ok) { const d = await ir.text().catch(() => ""); return json({ error: "Image error", detail: d }, 502, headers); }
+    if (!ir.ok) {
+      const d = await ir.text().catch(() => "");
+      let msg = d;
+      try { const j = JSON.parse(d); if (j && j.error && j.error.message) msg = j.error.message; } catch (e) {}
+      // limit:0 / quota / billing => the free tier no longer covers image models
+      const billing = ir.status === 429 || /quota|billing|limit:\s*0/i.test(msg);
+      return json({
+        error: billing
+          ? "Image generation needs billing enabled on your Gemini key (the free tier no longer covers image models)."
+          : "Image generation failed.",
+        detail: msg || ("HTTP " + ir.status),
+        status: ir.status,
+      }, 502, headers);
+    }
     const idata = await ir.json();
     const iparts = (idata.candidates && idata.candidates[0] && idata.candidates[0].content && idata.candidates[0].content.parts) || [];
     let image = null, caption = "";
